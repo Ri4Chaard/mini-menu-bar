@@ -5,6 +5,7 @@
  * lives in the main process (research.md R-004) - a renderer-owned countdown
  * would be throttled while hidden.
  */
+import { app } from 'electron'
 import type { Menubar } from 'menubar'
 import { EVENT_CHANNELS } from '@shared/channels'
 import { initialPanelState, panelReducer, type PanelEvent, type PanelState } from './panel-state'
@@ -57,8 +58,20 @@ export function createPanelController(mb: Menubar): PanelController {
 
     const window = mb.window
     if (window) {
-      // Take focus explicitly. Without this the panel can sit visible but
-      // unfocused, which makes every subsequent blur look like a dismissal.
+      // Activate the APPLICATION, not just the window.
+      //
+      // window.focus() alone gives the panel keyboard focus but leaves the
+      // system menu bar owned by whatever app was frontmost - so the menu bar
+      // keeps following that app and disappears when the pointer moves away,
+      // even though our panel is still open. An accessory app (LSUIElement, no
+      // Dock icon) has to activate explicitly, and menubar makes this worse by
+      // calling setVisibleOnAllWorkspaces with skipTransformProcessType, which
+      // deliberately skips the transform that would otherwise activate us.
+      //
+      // Activating means the menu bar belongs to this app for as long as the
+      // panel is open, which is the requested behaviour: while the panel is
+      // open, the menu bar cannot go away.
+      app.focus({ steal: true })
       window.focus()
       window.once('focus', () => {
         everFocused = true
