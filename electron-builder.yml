@@ -1,0 +1,38 @@
+appId: cc.qubiq.minimenubar
+productName: Mini Menu Bar
+copyright: Copyright © 2026 Yaroslav
+
+directories:
+  output: release
+  buildResources: resources
+
+files:
+  - out/**/*
+  - package.json
+
+extraResources:
+  - from: resources
+    to: resources
+
+mac:
+  category: public.app-category.utilities
+  target:
+    - dmg
+    - zip
+  # A menu bar utility has no Dock presence and no main window.
+  extendInfo:
+    LSUIElement: true
+    # Required for Apple Events. Without this key macOS kills the process rather
+    # than prompting, so Spotify control silently never works (research.md R-007).
+    NSAppleEventsUsageDescription: >-
+      Mini Menu Bar uses automation to show what Spotify is playing and to
+      control playback from the menu bar.
+    NSDesktopFolderUsageDescription: >-
+      Mini Menu Bar reads your Desktop to show recent screenshots. It never
+      modifies, moves, or deletes any file.
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+
+dmg:
+  artifactName: ${productName}-${version}.${ext}
