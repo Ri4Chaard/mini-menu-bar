@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+/* Appearance tokens are declared exactly once here and switched by
+   prefers-color-scheme. No JavaScript, no re-render — the panel follows a
+   system appearance change while it is open (spec edge case, quickstart V-014).
+   Per-component colour literals are forbidden by the constitution; every
+   component references these tokens. */
+@theme {
+  --color-surface: #f5f5f7;
+  --color-surface-raised: #ffffff;
+  --color-surface-hover: #ebebef;
+  --color-border: #d8d8de;
+  --color-text: #1c1c1e;
+  --color-text-muted: #6b6b73;
+  --color-accent: #2f6feb;
+  --color-accent-text: #ffffff;
+  --color-danger: #c8372d;
+
+  --radius-panel: 12px;
+  --radius-card: 8px;
+
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-surface: #1c1c1e;
+    --color-surface-raised: #2c2c2e;
+    --color-surface-hover: #3a3a3c;
+    --color-border: #3a3a3c;
+    --color-text: #f2f2f7;
+    --color-text-muted: #98989f;
+    --color-accent: #4f8bff;
+    --color-accent-text: #0b0b0c;
+    --color-danger: #ff6b5f;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: 13px;
+  overflow: hidden;
+}
+
+/* Constitution Principle III: honour the system reduce-motion setting.
+   Belt and braces alongside Motion's useReducedMotion — this also covers any
+   plain CSS transition that slips in. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
