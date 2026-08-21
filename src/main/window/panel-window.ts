@@ -2,10 +2,9 @@
  * Wires the pure panel state machine to the menubar-managed BrowserWindow.
  *
  * `menubar` hides the window rather than destroying it, which is why the timer
- * lives in the main process (research.md R-004) — a renderer-owned countdown
+ * lives in the main process (research.md R-004) - a renderer-owned countdown
  * would be throttled while hidden.
  */
-import type { BrowserWindow } from 'electron'
 import type { Menubar } from 'menubar'
 import { EVENT_CHANNELS } from '@shared/channels'
 import { initialPanelState, panelReducer, type PanelEvent, type PanelState } from './panel-state'
@@ -16,8 +15,20 @@ export interface PanelController {
   close(): void
 }
 
+/**
+ * Grace period after showing during which focus loss is ignored.
+ *
+ * A menu bar app runs as an accessory (LSUIElement, no Dock icon), so macOS
+ * often hands focus straight back to the previously active application in the
+ * moments after the panel appears. Treating that as a dismissal is what made
+ * the panel vanish as soon as the pointer moved away.
+ */
+const FOCUS_GRACE_MS = 400
+
 export function createPanelController(mb: Menubar): PanelController {
   let state: PanelState = initialPanelState
+  let shownAt = 0
+  let everFocused = false
 
   const apply = (next: PanelState): void => {
     if (next.visible === state.visible) {
@@ -39,26 +50,42 @@ export function createPanelController(mb: Menubar): PanelController {
     }
   }
 
-  // menubar drives show/hide itself on tray click; mirror its result into our
-  // state so the machine and the window never disagree.
   mb.on('after-show', () => {
     state = { visible: true, lastDismissal: null }
-    mb.window?.webContents.send(EVENT_CHANNELS.panelShown)
+    shownAt = Date.now()
+    everFocused = false
+
+    const window = mb.window
+    if (window) {
+      // Take focus explicitly. Without this the panel can sit visible but
+      // unfocused, which makes every subsequent blur look like a dismissal.
+      window.focus()
+      window.once('focus', () => {
+        everFocused = true
+      })
+    }
+    window?.webContents.send(EVENT_CHANNELS.panelShown)
   })
+
   mb.on('after-hide', () => {
     state = { visible: false, lastDismissal: state.lastDismissal ?? 'tray-click' }
   })
 
-  return controller
-}
-
-/**
- * FR-002 blur dismissal. menubar's own `alwaysOnTop: false` handling covers the
- * common case, but an explicit blur listener is required so the panel also
- * dismisses when focus moves to another app without a click landing on it.
- */
-export function attachBlurDismissal(window: BrowserWindow, controller: PanelController): void {
-  window.on('blur', () => {
-    if (!window.webContents.isDevToolsFocused()) controller.handle('blur')
+  /**
+   * With `alwaysOnTop` set, menubar emits this instead of hiding the window on
+   * its own 100 ms blur timer, which leaves the decision here.
+   *
+   * FR-002 still holds - activating another application dismisses the panel -
+   * but only genuine focus loss counts. Blur inside the grace period, or before
+   * the window ever held focus, is the accessory-app artefact described above
+   * and is ignored.
+   */
+  mb.on('focus-lost', () => {
+    if (!state.visible) return
+    if (!everFocused) return
+    if (Date.now() - shownAt < FOCUS_GRACE_MS) return
+    controller.handle('blur')
   })
+
+  return controller
 }

@@ -32,12 +32,21 @@ end if`
     if (value === '__NOT_RUNNING__') return { kind: 'not-running' }
     return { kind: 'ok', value }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
+    // execFile attaches the process's stderr separately; osascript reports the
+    // actual OSA error code there, not in `message`. Classifying on `message`
+    // alone therefore never saw the code and fell through to "not running".
+    const stderr = String((error as { stderr?: string }).stderr ?? '')
+    const message = `${error instanceof Error ? error.message : String(error)} ${stderr}`
+
     // -1743 is errAEEventNotPermitted: the user declined automation access.
     if (/-1743|not allowed|not authori[sz]ed|assistive access/i.test(message)) {
       return { kind: 'permission-denied' }
     }
     if (/-600|not running/i.test(message)) return { kind: 'not-running' }
+    // An unexpected script failure is NOT the same as Spotify being closed.
+    // Logging it is what makes it discoverable: an earlier bug here reported
+    // "Spotify isn't running" for a script error and hid the real cause.
+    console.error('[spotify] unexpected AppleScript failure:', stderr.trim() || message)
     return { kind: 'error', message }
   }
 }
@@ -47,10 +56,27 @@ export const FIELD_SEP = '\u001F'
 
 const S = "(ASCII character 31)"
 
-export const STATE_SCRIPT = `set st to player state as string
-  if st is "stopped" then return st
-  set n to name of current track
-  set a to artist of current track
-  set d to duration of current track
-  set p to player position
-  return st & ${S} & n & ${S} & a & ${S} & (d as string) & ${S} & (p as string)`
+/**
+ * Reads playback state in one round trip.
+ *
+ * Two things here are deliberate and were both bugs first:
+ *
+ *  - Variable names are spelled out. `st` is ambiguous to the AppleScript
+ *    parser (it reads as an ordinal suffix) and produced a hard syntax error,
+ *    which meant Spotify never worked at all.
+ *  - Position is rounded to whole milliseconds inside AppleScript. `player
+ *    position` is a float, and AppleScript formats floats using the user's
+ *    locale - on a Ukrainian system that is "98,248", which Number() parses as
+ *    NaN. Rounding to an integer means no decimal separator ever crosses the
+ *    boundary.
+ *  - Duration is NOT rounded. Spotify already reports it as an integer number
+ *    of milliseconds, and `round` on an integer fails with -1700, which took
+ *    the whole script down.
+ */
+export const STATE_SCRIPT = `set playerState to player state as text
+  if playerState is "stopped" then return playerState
+  set trackName to name of current track
+  set trackArtist to artist of current track
+  set trackDuration to duration of current track
+  set trackPosition to (round (player position * 1000))
+  return playerState & ${S} & trackName & ${S} & trackArtist & ${S} & (trackDuration as string) & ${S} & (trackPosition as string)`

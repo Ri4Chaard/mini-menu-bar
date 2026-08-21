@@ -5,12 +5,12 @@
  * sees any of this - it reaches the host only through the preload bridge
  * (constitution: Process model).
  */
-import { app, nativeImage, powerMonitor, shell, type BrowserWindow } from 'electron'
+import { app, nativeImage, powerMonitor, shell } from 'electron'
 import { menubar } from 'menubar'
 import { join } from 'node:path'
 import { EVENT_CHANNELS } from '@shared/channels'
 import { registerIpcHandlers, type AppServices } from './ipc/register'
-import { createPanelController, attachBlurDismissal } from './window/panel-window'
+import { createPanelController } from './window/panel-window'
 import { createPreferencesService } from './services/preferences/preferences-service'
 import { createScreenshotService } from './services/screenshots/screenshot-store'
 import { createTimerService } from './services/timer/timer-service'
@@ -60,6 +60,9 @@ async function bootstrap(): Promise<void> {
       width: 460,
       height: 420,
       resizable: false,
+      // Required so menubar emits 'focus-lost' instead of hiding the panel on
+      // its own 100 ms blur timer. Dismissal is decided in panel-window.ts.
+      alwaysOnTop: true,
       // Constitution, Security. These three are non-negotiable.
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
@@ -73,8 +76,6 @@ async function bootstrap(): Promise<void> {
 
   mb.on('ready', async () => {
     const panel = createPanelController(mb)
-    const window = mb.window as BrowserWindow | undefined
-    if (window) attachBlurDismissal(window, panel)
 
     const send = (channel: string, payload?: unknown): void => {
       const target = mb.window

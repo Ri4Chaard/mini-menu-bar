@@ -57,7 +57,9 @@ export function createScreenshotService(preferences: PreferencesService): Screen
   }
 
   const ingest = async (path: string): Promise<void> => {
-    // Confirm by metadata, never by filename (research.md R-003).
+    // Confirm by metadata, never by filename (research.md R-003). This retries:
+    // Spotlight takes roughly two seconds to stamp the attribute after the file
+    // is written, so a single early check silently drops fresh screenshots.
     if (!(await isScreenshot(path))) return
     const raw = await describe(path)
     if (!raw) return
@@ -72,6 +74,24 @@ export function createScreenshotService(preferences: PreferencesService): Screen
       height: thumb.height,
       isSeen: false
     })
+  }
+
+    /**
+   * Bounded concurrency. Thumbnail generation opens image files, and firing
+   * fifty at once on a machine with a real screenshot history starves the
+   * event loop and produces intermittent failures.
+   */
+  const mapLimited = async <T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> => {
+    const out: R[] = new Array(items.length)
+    let next = 0
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (next < items.length) {
+        const index = next++
+        out[index] = await fn(items[index]!)
+      }
+    })
+    await Promise.all(workers)
+    return out
   }
 
   const watcher = createDirectoryWatcher(
@@ -145,21 +165,19 @@ export function createScreenshotService(preferences: PreferencesService): Screen
     async start() {
       try {
         const raws = await backfillScreenshots()
-        const built = await Promise.all(
-          raws.map(async (raw) => {
-            const thumb = await makeThumbnail(raw.path)
-            return {
-              id: raw.path,
-              path: raw.path,
-              fileName: raw.fileName,
-              capturedAt: raw.capturedAt,
-              thumbnailDataUrl: thumb.dataUrl,
-              width: thumb.width,
-              height: thumb.height,
-              isSeen: false
-            } satisfies ScreenshotEntry
-          })
-        )
+        const built = await mapLimited(raws, 6, async (raw) => {
+          const thumb = await makeThumbnail(raw.path)
+          return {
+            id: raw.path,
+            path: raw.path,
+            fileName: raw.fileName,
+            capturedAt: raw.capturedAt,
+            thumbnailDataUrl: thumb.dataUrl,
+            width: thumb.width,
+            height: thumb.height,
+            isSeen: false
+          } satisfies ScreenshotEntry
+        })
         entries = built.sort((a, b) => b.capturedAt - a.capturedAt).slice(0, MAX_SCREENSHOTS)
         error = null
       } catch (cause) {

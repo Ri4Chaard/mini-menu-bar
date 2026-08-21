@@ -31,13 +31,28 @@ const unavailable = (availability: PlaybackState['availability']): PlaybackState
   durationMs: null
 })
 
+/**
+ * Locale-safe numeric parse.
+ *
+ * AppleScript formats numbers with the user's decimal separator, so a Ukrainian
+ * or German system yields "98,248" where Number() gives NaN. The script now
+ * rounds to integers so this should not trigger, but a stray separator must
+ * degrade to a sane value rather than blanking the whole playback state.
+ */
+function toNumber(value: string | undefined): number {
+  if (!value) return 0
+  const n = Number(value.replace(',', '.').replace(/\s/g, ''))
+  return Number.isFinite(n) ? n : 0
+}
+
 export function parseStateOutput(raw: string): PlaybackState {
   const parts = raw.split(FIELD_SEP)
   const state = parts[0] ?? 'stopped'
   if (state === 'stopped' || parts.length < 5) return unavailable('stopped')
 
-  const durationMs = Math.round(Number(parts[3]) || 0)
-  const positionMs = Math.round((Number(parts[4]) || 0) * 1000)
+  // Both already whole milliseconds - AppleScript rounds them (see STATE_SCRIPT).
+  const durationMs = Math.round(toNumber(parts[3]))
+  const positionMs = Math.round(toNumber(parts[4]))
   return {
     availability: state === 'playing' ? 'playing' : 'paused',
     trackName: parts[1] || null,
