@@ -29,6 +29,16 @@ export interface HostBridge {
   copyScreenshots(ids: string[]): Promise<void>
   /** Moves to the Trash, never unlink - deletion stays recoverable (R-108). */
   deleteScreenshots(ids: string[]): Promise<void>
+  /**
+   * Hand these files to the OS drag session, so they can be dropped into
+   * another application as real files.
+   *
+   * The renderer has no paths and must not have any, so it cancels its own
+   * HTML5 drag and delegates. Call this from a `dragstart` handler: macOS only
+   * starts a drag while a mouse button is genuinely down, so it does nothing
+   * useful anywhere else.
+   */
+  startScreenshotDrag(ids: string[]): Promise<void>
 
   // ---- Timer (FR-016..FR-020) ----------------------------------------------
   getTimerState(): Promise<TimerState>

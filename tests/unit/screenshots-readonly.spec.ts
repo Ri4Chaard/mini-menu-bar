@@ -24,6 +24,7 @@ const DIR = join(process.cwd(), 'src/main/services/screenshots')
 const MODULES = [
   'screenshot-store.ts',
   'spotlight-source.ts',
+  'staging-source.ts',
   'fs-watcher.ts',
   'thumbnail.ts',
   'location-resolver.ts'

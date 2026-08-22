@@ -6,13 +6,24 @@
  * that mechanically (FR-014a).
  */
 import { access, constants } from 'node:fs/promises'
-import { shell } from 'electron'
+import { shell, type WebContents } from 'electron'
 import { BridgeError } from '@shared/errors'
 import { MAX_SCREENSHOTS, type ScreenshotEntry, type SourceError } from '@shared/types'
 import type { PreferencesService } from '../preferences/preferences-service'
-import { copyScreenshotsToClipboard, nothingDeleted, trashScreenshot } from './actions'
-import { backfillScreenshots, describe, isScreenshot } from './spotlight-source'
+import {
+  beginScreenshotDrag,
+  copyScreenshotsToClipboard,
+  nothingDeleted,
+  trashScreenshot
+} from './actions'
+import { backfillScreenshots, describe, isScreenshot, type RawScreenshot } from './spotlight-source'
 import { createDirectoryWatcher } from './fs-watcher'
+import {
+  describeStagingCapture,
+  isStagingCapture,
+  listStagingCaptures,
+  stagingWatchRoot
+} from './staging-source'
 import { resolveWatchedDirectories } from './location-resolver'
 import { makeThumbnail } from './thumbnail'
 
@@ -23,6 +34,7 @@ export interface ScreenshotService {
   markSeen(): Promise<void>
   copy(ids: readonly string[]): Promise<void>
   remove(ids: readonly string[]): Promise<void>
+  startDrag(ids: readonly string[], sender: WebContents): Promise<void>
   sourceError(): Promise<SourceError | null>
   latest(): ScreenshotEntry | null
   unseenCount(): number
@@ -59,15 +71,9 @@ export function createScreenshotService(preferences: PreferencesService): Screen
     if (entries.length !== before) emit()
   }
 
-  const ingest = async (path: string): Promise<void> => {
-    // Confirm by metadata, never by filename (research.md R-003). This retries:
-    // Spotlight takes roughly two seconds to stamp the attribute after the file
-    // is written, so a single early check silently drops fresh screenshots.
-    if (!(await isScreenshot(path))) return
-    const raw = await describe(path)
-    if (!raw) return
+  const build = async (raw: RawScreenshot): Promise<ScreenshotEntry> => {
     const thumb = await makeThumbnail(raw.path)
-    insert({
+    return {
       id: raw.path,
       path: raw.path,
       fileName: raw.fileName,
@@ -75,8 +81,34 @@ export function createScreenshotService(preferences: PreferencesService): Screen
       thumbnailDataUrl: thumb.dataUrl,
       width: thumb.width,
       height: thumb.height,
+      isTemporary: raw.isTemporary,
       isSeen: false
-    })
+    }
+  }
+
+  /**
+   * Two sources, two identification rules, and the path decides which applies.
+   *
+   * A file in a saved location is confirmed by metadata, never by filename
+   * (research.md R-003), and that check retries: Spotlight takes roughly two
+   * seconds to stamp the attribute after the file is written, so a single early
+   * check silently drops fresh screenshots.
+   *
+   * A staged capture can never pass that check - the temporary area is outside
+   * the Spotlight index - so putting it through the same path would spend six
+   * seconds retrying and then discard it. Its provenance is the proof instead
+   * (staging-source.ts).
+   */
+  const ingest = async (path: string): Promise<void> => {
+    if (isStagingCapture(path)) {
+      const staged = await describeStagingCapture(path)
+      if (staged) insert(await build(staged))
+      return
+    }
+    if (!(await isScreenshot(path))) return
+    const raw = await describe(path)
+    if (!raw) return
+    insert(await build(raw))
   }
 
     /**
@@ -196,6 +228,32 @@ export function createScreenshotService(preferences: PreferencesService): Screen
       if (deleted === 0 && ids.length > 0) throw nothingDeleted()
     },
 
+    /**
+     * Ids in, a native drag out. Same rule as copy: the renderer never names a
+     * file, and a drag of 3 live files out of 4 succeeds - only resolving none
+     * of them is a failure, because then nothing would leave the panel and the
+     * user would be left dragging a cursor that carries nothing.
+     */
+    async startDrag(ids, sender) {
+      const live: ScreenshotEntry[] = []
+      for (const id of ids) {
+        const entry = entries.find((e) => e.id === id)
+        if (!entry) continue
+        try {
+          await access(entry.path, constants.R_OK)
+          live.push(entry)
+        } catch {
+          drop(id)
+        }
+      }
+
+      const first = live[0]
+      if (!first) {
+        throw new BridgeError('FILE_NOT_FOUND', 'Those screenshots are no longer available.')
+      }
+      beginScreenshotDrag(sender, live.map((e) => e.path), first.thumbnailDataUrl)
+    },
+
     async sourceError() {
       return error
     },
@@ -210,26 +268,37 @@ export function createScreenshotService(preferences: PreferencesService): Screen
     },
 
     async start() {
+      let indexed: RawScreenshot[] = []
       try {
-        const raws = await backfillScreenshots()
-        const built = await mapLimited(raws, 6, async (raw) => {
-          const thumb = await makeThumbnail(raw.path)
-          return {
-            id: raw.path,
-            path: raw.path,
-            fileName: raw.fileName,
-            capturedAt: raw.capturedAt,
-            thumbnailDataUrl: thumb.dataUrl,
-            width: thumb.width,
-            height: thumb.height,
-            isSeen: false
-          } satisfies ScreenshotEntry
-        })
-        entries = built.sort((a, b) => b.capturedAt - a.capturedAt).slice(0, MAX_SCREENSHOTS)
+        indexed = await backfillScreenshots()
         error = null
       } catch (cause) {
         error = classifyError(cause)
       }
+
+      // Staging is a supplementary source, so its failures are separate from
+      // the section's error state in both directions: an unreadable temporary
+      // area must not blank a working Spotlight index, and a failed Spotlight
+      // query must not hide captures that are sitting right there.
+      const staged = await listStagingCaptures().catch(() => [])
+
+      // Identity is the path (data-model.md), so a saved capture and its staged
+      // original are two entries, not one - which is correct: the staged copy is
+      // about to disappear and the saved one is not. The map is here to collapse
+      // a repeat within a single source, not to reconcile across them.
+      const byPath = new Map<string, RawScreenshot>()
+      for (const raw of [...indexed, ...staged]) {
+        if (!byPath.has(raw.path)) byPath.set(raw.path, raw)
+      }
+
+      // Capped BEFORE thumbnails are generated. Two sources can together exceed
+      // the cap, and building thumbnails for entries that are about to be
+      // sliced off is work nobody sees.
+      const merged = [...byPath.values()]
+        .sort((a, b) => b.capturedAt - a.capturedAt)
+        .slice(0, MAX_SCREENSHOTS)
+
+      entries = await mapLimited(merged, 6, build)
       await this.refreshLocation()
       emit()
     },
@@ -237,7 +306,17 @@ export function createScreenshotService(preferences: PreferencesService): Screen
     /** FR-014b: follow the system save location if the user changes it. */
     async refreshLocation() {
       try {
-        watcher.retarget(await resolveWatchedDirectories())
+        const saved = await resolveWatchedDirectories()
+        watcher.retarget([
+          ...saved.map((directory) => ({ directory })),
+          // The whole temporary directory, not the staging root: that root
+          // cannot be watched or listed at all, while a recursive watch one
+          // level up still reports the paths inside it (staging-source.ts).
+          // Which is why the filter matters here more than anywhere else - this
+          // target sees every temporary file every application writes, and
+          // isStagingCapture rejects them without touching the disk.
+          { directory: stagingWatchRoot(), recursive: true, accept: isStagingCapture }
+        ])
       } catch (cause) {
         error = classifyError(cause)
         emit()

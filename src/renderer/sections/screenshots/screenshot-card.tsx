@@ -14,6 +14,19 @@ export function relativeTime(capturedAt: number, now: number): string {
 }
 
 /**
+ * What the corner chip says.
+ *
+ * A staged capture is labelled rather than styled differently: it is a normal
+ * screenshot in every respect except that it will disappear on its own, and the
+ * only honest way to show that is to say so. Exported so the wording is covered
+ * without rendering.
+ */
+export function timeChipLabel(entry: ScreenshotEntry, now: number): string {
+  const elapsed = relativeTime(entry.capturedAt, now)
+  return entry.isTemporary ? `Unsaved · ${elapsed}` : elapsed
+}
+
+/**
  * One thumbnail in the strip: 124x88 image, a corner selection badge, a
  * relative-time chip, and a 124x13 meta row beneath (FR-055, FR-056).
  */
@@ -23,7 +36,8 @@ export function ScreenshotCard({
   now,
   onToggle,
   onOpen,
-  onReveal
+  onReveal,
+  onDragStart
 }: {
   entry: ScreenshotEntry
   selected: boolean
@@ -31,10 +45,18 @@ export function ScreenshotCard({
   onToggle: (id: string) => void
   onOpen: (id: string) => void
   onReveal: (id: string) => void
+  onDragStart: (event: React.DragEvent, id: string) => void
 }): ReactNode {
   return (
     <li className="flex shrink-0 flex-col gap-[7px]" style={{ width: 'var(--thumb-w)' }}>
+      {/* Draggable on the frame, not on the image: the drag source is the
+          nearest draggable ancestor of whatever was pressed, so picking the
+          frame up works from the thumbnail, the badge and the chip alike. The
+          image itself stays undraggable so it cannot start a second, competing
+          drag of its own bitmap. */}
       <div
+        draggable
+        onDragStart={(event) => onDragStart(event, entry.id)}
         className="relative overflow-hidden rounded-[var(--radius-control)] bg-[var(--color-fill)]"
         style={{ width: 'var(--thumb-w)', height: 'var(--thumb-h)' }}
       >
@@ -70,7 +92,7 @@ export function ScreenshotCard({
         </button>
 
         <span className="absolute right-1.5 bottom-1.5 rounded-[var(--radius-chip)] bg-[var(--color-scrim)] px-1.5 py-0.5 text-[length:var(--text-micro)] text-[var(--color-on-accent)]">
-          {relativeTime(entry.capturedAt, now)}
+          {timeChipLabel(entry, now)}
         </span>
       </div>
 

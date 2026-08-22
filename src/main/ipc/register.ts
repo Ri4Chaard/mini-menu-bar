@@ -10,7 +10,7 @@
  * a section whose story has not landed yet reports a clear message rather than
  * crashing the process.
  */
-import { app, ipcMain } from 'electron'
+import { app, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { BridgeError, serializeError } from '@shared/errors'
 import { INVOKE_CHANNELS, type InvokeChannel } from '@shared/channels'
 import {
@@ -51,7 +51,21 @@ function need<T>(service: T | undefined, name: string): T {
   return service
 }
 
-type Handler = (payload: unknown) => unknown | Promise<unknown>
+/**
+ * The event is passed through because one channel genuinely needs it: a native
+ * drag is started FROM a webContents, so `screenshots:start-drag` has to know
+ * which one asked. Everything else ignores it.
+ */
+type Handler = (payload: unknown, event: IpcMainInvokeEvent) => unknown | Promise<unknown>
+
+/**
+ * How long focus loss is ignored after a drag begins.
+ *
+ * Electron reports no drag-finished event, so this is a bound rather than a
+ * signal. It has to outlast a deliberate drag across the screen and stay short
+ * enough that the panel still dismisses promptly once the drop is done.
+ */
+const DRAG_DISMISSAL_GRACE_MS = 6000
 
 export function registerIpcHandlers(services: AppServices): void {
   const handlers: Record<InvokeChannel, Handler> = {
@@ -70,6 +84,14 @@ export function registerIpcHandlers(services: AppServices): void {
       need(services.screenshots, 'Screenshots').copy(requireIdArray(p, MAX_SCREENSHOTS)),
     [INVOKE_CHANNELS.screenshotsDelete]: (p) =>
       need(services.screenshots, 'Screenshots').remove(requireIdArray(p, MAX_SCREENSHOTS)),
+    [INVOKE_CHANNELS.screenshotsStartDrag]: async (p, event) => {
+      const ids = requireIdArray(p, MAX_SCREENSHOTS)
+      // Suppressed BEFORE the drag starts, not after: the drop target becoming
+      // frontmost is the focus loss FR-002 would read as a dismissal, and
+      // hiding the panel mid-drag cancels the drag with it.
+      services.panel.suppressDismissal(DRAG_DISMISSAL_GRACE_MS)
+      await need(services.screenshots, 'Screenshots').startDrag(ids, event.sender)
+    },
 
     // ---- Timer -------------------------------------------------------------
     [INVOKE_CHANNELS.timerGet]: () => need(services.timer, 'Timer').get(),
@@ -129,9 +151,9 @@ export function registerIpcHandlers(services: AppServices): void {
 
   for (const [channel, handler] of Object.entries(handlers)) {
     ipcMain.removeHandler(channel)
-    ipcMain.handle(channel, async (_event, payload: unknown) => {
+    ipcMain.handle(channel, async (event, payload: unknown) => {
       try {
-        return await handler(payload)
+        return await handler(payload, event)
       } catch (error) {
         // Normalise before crossing the boundary (contracts/host-bridge.md).
         // The original is kept as `cause` for main-process logs; only the

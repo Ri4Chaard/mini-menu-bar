@@ -14,6 +14,13 @@ export interface PanelController {
   handle(event: PanelEvent): void
   state(): PanelState
   close(): void
+  /**
+   * Ignore focus loss for the next `ms`. Used by the one operation that
+   * deliberately hands focus elsewhere - dragging a file out - where FR-002's
+   * "activating another application dismisses the panel" would otherwise hide
+   * the very window that owns the drag, cancelling it.
+   */
+  suppressDismissal(ms: number): void
 }
 
 /**
@@ -30,6 +37,7 @@ export function createPanelController(mb: Menubar): PanelController {
   let state: PanelState = initialPanelState
   let shownAt = 0
   let everFocused = false
+  let suppressedUntil = 0
 
   const apply = (next: PanelState): void => {
     if (next.visible === state.visible) {
@@ -48,6 +56,12 @@ export function createPanelController(mb: Menubar): PanelController {
     state: () => state,
     close() {
       apply(panelReducer(state, 'escape'))
+    },
+    suppressDismissal(ms) {
+      // Bounded, and never shortened by a later shorter request. An unbounded
+      // hold would leave the panel unable to dismiss at all if the drag were
+      // abandoned - Electron reports no drag-finished event to release it on.
+      suppressedUntil = Math.max(suppressedUntil, Date.now() + ms)
     }
   }
 
@@ -55,6 +69,7 @@ export function createPanelController(mb: Menubar): PanelController {
     state = { visible: true, lastDismissal: null }
     shownAt = Date.now()
     everFocused = false
+    suppressedUntil = 0
 
     const window = mb.window
     if (window) {
@@ -97,6 +112,7 @@ export function createPanelController(mb: Menubar): PanelController {
     if (!state.visible) return
     if (!everFocused) return
     if (Date.now() - shownAt < FOCUS_GRACE_MS) return
+    if (Date.now() < suppressedUntil) return
     controller.handle('blur')
   })
 

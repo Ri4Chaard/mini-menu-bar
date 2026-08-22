@@ -18,3 +18,15 @@ export function reconcileSelection(
   if (survivors.length === selected.size) return selected
   return new Set(survivors)
 }
+
+/**
+ * Which screenshots a drag carries.
+ *
+ * Dragging a SELECTED thumbnail drags the whole selection; dragging an
+ * unselected one drags just that file and leaves the selection untouched. That
+ * is Finder's rule, and the alternative - always sending the selection - would
+ * silently attach files the user had forgotten were still ticked.
+ */
+export function dragIdsFor(id: string, selected: ReadonlySet<string>): string[] {
+  return selected.has(id) ? [...selected] : [id]
+}

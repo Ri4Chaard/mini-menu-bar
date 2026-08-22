@@ -17,6 +17,7 @@ import type { HostBridge } from '../../src/renderer/host/host-contract'
 const CONTRACT_METHODS: (keyof HostBridge)[] = [
   'listScreenshots', 'openScreenshot', 'revealScreenshot', 'markScreenshotsSeen',
   'onScreenshotsChanged', 'getScreenshotSourceError', 'copyScreenshots', 'deleteScreenshots',
+  'startScreenshotDrag',
   'getTimerState', 'startTimer', 'pauseTimer', 'resumeTimer', 'resetTimer', 'onTimerStateChanged',
   'getPlaybackState', 'togglePlayPause', 'nextTrack', 'previousTrack', 'seekTo', 'onPlaybackStateChanged',
   'setVolume', 'setShuffle', 'setRepeat',
@@ -269,6 +270,27 @@ describe('HostBridge contract — mock implementation', () => {
     })
   })
 
+  describe('dragging screenshots out', () => {
+    it('carries exactly the ids it was given', async () => {
+      const [first, second] = await host.listScreenshots()
+      await host.startScreenshotDrag([first!.id, second!.id])
+      expect(host.__mock.lastDragIds()).toEqual([first!.id, second!.id])
+    })
+
+    it('refuses a drag that resolves no live file', async () => {
+      // The alternative is a drag session carrying nothing: the cursor picks up
+      // an image and the drop silently does nothing at the far end.
+      await expect(host.startScreenshotDrag(['gone'])).rejects.toThrow()
+      expect(host.__mock.lastDragIds()).toBeNull()
+    })
+
+    it('drags the files that still resolve when some have vanished', async () => {
+      const [first] = await host.listScreenshots()
+      await host.startScreenshotDrag([first!.id, 'gone'])
+      expect(host.__mock.lastDragIds()).toEqual([first!.id])
+    })
+  })
+
   describe('spotify volume, shuffle and repeat (FR-068 as amended)', () => {
     it('accepts the ends of the volume range', async () => {
       await expect(host.setVolume(0)).resolves.toBeUndefined()
@@ -415,6 +437,11 @@ describe('HostBridge contract — real implementation wiring', () => {
   it('sends ids rather than filesystem paths for screenshot actions', async () => {
     await real.openScreenshot('some-id')
     expect(invoke).toHaveBeenCalledWith(INVOKE_CHANNELS.screenshotsOpen, { id: 'some-id' })
+  })
+
+  it('starts a drag by id, so the renderer never names a file', async () => {
+    await real.startScreenshotDrag(['a', 'b'])
+    expect(invoke).toHaveBeenCalledWith(INVOKE_CHANNELS.screenshotsStartDrag, { ids: ['a', 'b'] })
   })
 
   it('brackets a playback subscription with subscribe(true) and subscribe(false)', () => {

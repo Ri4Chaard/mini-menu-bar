@@ -33,23 +33,34 @@ function swatch(hue: number, label: string): string {
 
 const MINUTE = 60_000
 
+/**
+ * The newest entry is staged on purpose. A capture that was taken but never
+ * saved renders differently, and a mock where that state is unreachable cannot
+ * show whether the difference actually reads (Principle I, "mock obligations").
+ */
 function seedScreenshots(now: number): ScreenshotEntry[] {
   return [
-    { label: 'Design review', hue: 210, ago: 2 * MINUTE },
-    { label: 'Bug repro', hue: 12, ago: 26 * MINUTE },
-    { label: 'Invoice', hue: 140, ago: 3 * 60 * MINUTE },
-    { label: 'Chat thread', hue: 280, ago: 9 * 60 * MINUTE },
-    { label: 'Old mockup', hue: 45, ago: 52 * 60 * MINUTE }
-  ].map((s, i) => ({
-    id: `/Users/mock/Desktop/Screenshot ${i + 1}.png`,
-    path: `/Users/mock/Desktop/Screenshot ${i + 1}.png`,
-    fileName: `Screenshot ${i + 1}.png`,
-    capturedAt: now - s.ago,
-    thumbnailDataUrl: swatch(s.hue, s.label),
-    width: 320,
-    height: 200,
-    isSeen: i > 1
-  }))
+    { label: 'Design review', hue: 210, ago: 2 * MINUTE, staged: true },
+    { label: 'Bug repro', hue: 12, ago: 26 * MINUTE, staged: false },
+    { label: 'Invoice', hue: 140, ago: 3 * 60 * MINUTE, staged: false },
+    { label: 'Chat thread', hue: 280, ago: 9 * 60 * MINUTE, staged: false },
+    { label: 'Old mockup', hue: 45, ago: 52 * 60 * MINUTE, staged: false }
+  ].map((s, i) => {
+    const path = s.staged
+      ? `/mock/tmp/TemporaryItems/NSIRD_screencaptureui_mock/Screenshot ${i + 1}.png`
+      : `/Users/mock/Desktop/Screenshot ${i + 1}.png`
+    return {
+      id: path,
+      path,
+      fileName: `Screenshot ${i + 1}.png`,
+      capturedAt: now - s.ago,
+      thumbnailDataUrl: swatch(s.hue, s.label),
+      width: 320,
+      height: 200,
+      isTemporary: s.staged,
+      isSeen: i > 1
+    }
+  })
 }
 
 const MOCK_TRACKS = [
@@ -75,6 +86,8 @@ export interface MockControls {
   setArtworkMissing(missing: boolean): void
   /** True once quitApp was called - the mock cannot actually exit. */
   didQuit(): boolean
+  /** Which ids the last drag carried, so the selection rule is assertable. */
+  lastDragIds(): string[] | null
 }
 
 export function createMockBridge(): HostBridge & { __mock: MockControls } {
@@ -84,6 +97,7 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
   let nextFileMissing = false
   let clipboardMode: 'image' | 'references' | null = null
   let deleteFails = false
+  let dragIds: string[] | null = null
   let artworkMissing = false
   let quit = false
   let notes: Note[] = [
@@ -230,6 +244,19 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
         throw new BridgeError('FILE_NOT_FOUND', 'No screenshots to copy')
       }
       clipboardMode = live.length === 1 ? 'image' : 'references'
+    },
+    /**
+     * A browser cannot hand a real file to another application, so the mock
+     * records the request instead of performing it. It still enforces the same
+     * precondition as the host - a drag that resolves nothing is an error, not
+     * a cursor carrying nothing.
+     */
+    async startScreenshotDrag(ids) {
+      const live = ids.filter((id) => screenshots.some((s) => s.id === id))
+      if (live.length === 0) {
+        throw new BridgeError('FILE_NOT_FOUND', 'Those screenshots are no longer available.')
+      }
+      dragIds = live
     },
     async deleteScreenshots(ids) {
       if (deleteFails) {
@@ -433,6 +460,7 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
         emitPlayback()
       },
       didQuit: () => quit,
+      lastDragIds: () => (dragIds ? [...dragIds] : null),
       addScreenshot() {
         const n = screenshots.length + 1
         screenshots = [
@@ -444,6 +472,7 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
             thumbnailDataUrl: swatch((n * 57) % 360, `New ${n}`),
             width: 320,
             height: 200,
+            isTemporary: false,
             isSeen: false
           },
           ...screenshots

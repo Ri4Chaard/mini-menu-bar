@@ -19,12 +19,22 @@ export interface ScreenshotEntry {
   path: string
   /** Display label only. May be user-renamed; never used for identity. */
   fileName: string
-  /** Epoch ms, from kMDItemContentCreationDate. The sort key. */
+  /**
+   * Epoch ms. The sort key. From kMDItemContentCreationDate for an indexed
+   * file, or the file birth time for a staged capture, which no index covers.
+   */
   capturedAt: number
   /** null while thumbnail generation is pending. */
   thumbnailDataUrl: string | null
   width: number
   height: number
+  /**
+   * True while the capture is still parked in the macOS staging area: taken,
+   * but never saved anywhere the user can find it. Such a file disappears on
+   * its own once it is saved or discarded, so the strip labels it rather than
+   * letting it look like a file that will still be there tomorrow.
+   */
+  isTemporary: boolean
   /** Derived at read time from Preferences.screenshotsSeenWatermark. */
   isSeen: boolean
 }

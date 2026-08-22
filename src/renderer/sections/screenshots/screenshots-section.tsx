@@ -7,7 +7,7 @@ import { FooterNote, HeaderAction, SectionChrome } from '../../components/sectio
 import { PreviewToggle } from '../../components/preview-toggle'
 import { IconButton } from '../../components/ui/icon-button'
 import { ScreenshotCard } from './screenshot-card'
-import { reconcileSelection } from './selection'
+import { dragIdsFor, reconcileSelection } from './selection'
 
 /**
  * The collection is owned by App (the rail badge needs it too) and passed in,
@@ -68,6 +68,27 @@ export function ScreenshotsSection({
   const onReveal = useCallback(
     (id: string) => void act(() => host.revealScreenshot(id)),
     [act, host]
+  )
+
+  /**
+   * Dragging a thumbnail out drops the real files into whatever is underneath -
+   * a message, a mail draft, a Finder window.
+   *
+   * The renderer has no paths and must not have any, so in the host it cancels
+   * its own HTML5 drag and lets main start a native one from the same gesture.
+   * In browser mode there are no files to hand over, so the built-in image drag
+   * is left to run instead: the strip still behaves like a drag source in
+   * `dev:browser`, which is what makes the interaction reviewable there
+   * (Principle I).
+   */
+  const onDragStart = useCallback(
+    (event: React.DragEvent, id: string) => {
+      const ids = dragIdsFor(id, selected)
+      if (host.supportsNativeFeatures()) event.preventDefault()
+      else event.dataTransfer.setData('text/plain', id)
+      void act(() => host.startScreenshotDrag(ids))
+    },
+    [act, host, selected]
   )
 
   const ids = [...selected]
@@ -149,6 +170,7 @@ export function ScreenshotsSection({
                 onToggle={toggle}
                 onOpen={onOpen}
                 onReveal={onReveal}
+                onDragStart={onDragStart}
               />
             ))}
           </ul>

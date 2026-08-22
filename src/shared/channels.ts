@@ -14,6 +14,7 @@ export const INVOKE_CHANNELS = {
   screenshotsSourceError: 'screenshots:source-error',
   screenshotsCopy: 'screenshots:copy',
   screenshotsDelete: 'screenshots:delete',
+  screenshotsStartDrag: 'screenshots:start-drag',
 
   timerGet: 'timer:get',
   timerStart: 'timer:start',

@@ -48,6 +48,7 @@ export function createElectronBridge(): HostBridge {
     getScreenshotSourceError: () => call<SourceError | null>(INVOKE_CHANNELS.screenshotsSourceError),
     copyScreenshots: (ids) => call<void>(INVOKE_CHANNELS.screenshotsCopy, { ids }),
     deleteScreenshots: (ids) => call<void>(INVOKE_CHANNELS.screenshotsDelete, { ids }),
+    startScreenshotDrag: (ids) => call<void>(INVOKE_CHANNELS.screenshotsStartDrag, { ids }),
     onScreenshotsChanged: (cb) => on<ScreenshotEntry[]>(EVENT_CHANNELS.screenshotsChanged, cb),
 
     getTimerState: () => call<TimerState>(INVOKE_CHANNELS.timerGet),

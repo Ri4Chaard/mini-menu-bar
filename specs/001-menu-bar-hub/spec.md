@@ -212,6 +212,16 @@ persisted, edit it, then delete it.
 - **FR-014**: The app MUST index screenshots in place, reading them from the location macOS is
   currently configured to save screenshots to, plus the Desktop when that is not already the
   configured location.
+
+  > **Extended 2026-08-22 (amendment A-6).** The app also surfaces captures macOS has staged but
+  > not saved — taken with the floating-thumbnail preview, or with "Save to → Clipboard" — which
+  > never reach the configured location at all. Those files carry no Spotlight attribute, because
+  > the temporary area is outside the index, so they are identified by provenance instead: the
+  > directory `screencaptureui` created for them. They are marked as unsaved in the UI, since they
+  > disappear on their own. Two limits are inherent rather than chosen, and both were measured:
+  > the staging directory refuses `readdir` and `watch` with EPERM even for its owner, so a capture
+  > staged **before** the app started cannot be discovered, and detection works by watching the
+  > enclosing temporary directory instead. See `src/main/services/screenshots/staging-source.ts`.
 - **FR-014a**: The app MUST treat screenshot files as read-only. It MUST NOT move, rename, copy,
   delete, or otherwise modify them, and MUST NOT change the system screenshot save location.
 

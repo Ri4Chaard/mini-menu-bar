@@ -24,6 +24,12 @@ export interface RawScreenshot {
   path: string
   fileName: string
   capturedAt: number
+  /**
+   * True for a capture still parked in the macOS staging area - taken, but
+   * never saved anywhere the user can find it (staging-source.ts). It is the
+   * one fact about an entry the UI cannot re-derive from the path.
+   */
+  isTemporary: boolean
 }
 
 /** Parse Spotlight timestamps, which come back as `2026-08-21 14:31:13 +0000`. */
@@ -63,7 +69,7 @@ export async function describe(path: string): Promise<RawScreenshot | null> {
     const { stdout } = await run('mdls', ['-raw', '-name', CREATION_ATTR, path], { timeout: 5000 })
     const capturedAt = parseSpotlightDate(stdout)
     if (capturedAt === null) return null
-    return { path, fileName: basename(path), capturedAt }
+    return { path, fileName: basename(path), capturedAt, isTemporary: false }
   } catch {
     return null
   }
@@ -97,7 +103,7 @@ export function parseBackfillLine(line: string): RawScreenshot | null {
   const capturedAt = parseSpotlightDate(line.slice(at + marker.length))
   if (!path || capturedAt === null) return null
 
-  return { path, fileName: basename(path), capturedAt }
+  return { path, fileName: basename(path), capturedAt, isTemporary: false }
 }
 
 export async function backfillScreenshots(limit = MAX_SCREENSHOTS): Promise<RawScreenshot[]> {
