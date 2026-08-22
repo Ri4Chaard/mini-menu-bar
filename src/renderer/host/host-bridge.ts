@@ -56,6 +56,7 @@ export function createElectronBridge(): HostBridge {
     pauseTimer: () => call<TimerState>(INVOKE_CHANNELS.timerPause),
     resumeTimer: () => call<TimerState>(INVOKE_CHANNELS.timerResume),
     resetTimer: () => call<TimerState>(INVOKE_CHANNELS.timerReset),
+    dismissTimerAlarm: () => call<TimerState>(INVOKE_CHANNELS.timerDismissAlarm),
     onTimerStateChanged: (cb) => on<TimerState>(EVENT_CHANNELS.timerChanged, cb),
 
     getPlaybackState: () => call<PlaybackState>(INVOKE_CHANNELS.spotifyGet),

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Bell, Pause, Play, Plus, Repeat, RotateCcw } from 'lucide-react'
+import { Bell, BellOff, Pause, Play, Plus, Repeat, RotateCcw } from 'lucide-react'
 import { MAX_TIMER_PRESETS, type Preferences, type TimerState } from '@shared/types'
 import { useHost } from '../../host/use-host'
 import { FooterNote, HeaderAction, SectionChrome } from '../../components/section-chrome'
@@ -21,6 +21,9 @@ export function presetLabel(ms: number): string {
 
 /** "Ready · ends at 18:32" — the status line under the readout. */
 function statusLine(state: TimerState): string {
+  // The alarm outranks everything: it is the thing demanding attention, and it
+  // can be ringing over a countdown repeat has already restarted.
+  if (state.alarming) return 'Alarm ringing'
   if (state.status === 'finished') return 'Finished'
   if (state.status === 'idle') return `Ready · ${presetLabel(state.configuredDurationMs)}`
 
@@ -57,11 +60,17 @@ export function TimerSection({
   if (!state) return null
 
   const running = state.status === 'running'
-  const primary = running
-    ? { label: 'Pause', icon: Pause, run: () => host.pauseTimer() }
-    : state.status === 'paused'
-      ? { label: 'Resume', icon: Play, run: () => host.resumeTimer() }
-      : { label: 'Start', icon: Play, run: () => host.startTimer(state.configuredDurationMs) }
+  // Dismiss REPLACES the transport action rather than joining the row. The
+  // body band is a fixed 108 pt and the button row already fills its width, so
+  // a third button would push the presets out of the panel - and while an
+  // alarm is ringing, silencing it is the only thing the user came here to do.
+  const primary = state.alarming
+    ? { label: 'Dismiss', icon: BellOff, run: () => host.dismissTimerAlarm() }
+    : running
+      ? { label: 'Pause', icon: Pause, run: () => host.pauseTimer() }
+      : state.status === 'paused'
+        ? { label: 'Resume', icon: Play, run: () => host.resumeTimer() }
+        : { label: 'Start', icon: Play, run: () => host.startTimer(state.configuredDurationMs) }
   const PrimaryIcon = primary.icon
 
   const footer = (
@@ -69,8 +78,24 @@ export function TimerSection({
       <PreviewToggle section="timer" preferences={preferences} onUpdate={onUpdatePreferences} />
       <div style={{ gap: 'var(--footer-gap)' }} className="flex items-center">
         <FooterNote>When done</FooterNote>
-        <IconButton icon={Bell} label="Alert when the timer finishes" tone="fill" />
-        <IconButton icon={Repeat} label="Repeat the timer when it finishes" tone="fill" />
+        {/* Both are preferences, not commands, so they read as pressed and
+            survive a restart. Neither needs a bridge method: the main process
+            reads them at the moment the countdown reaches zero, which is what
+            lets either one take effect on the timer already running. */}
+        <IconButton
+          icon={Bell}
+          label="Sound an alarm when the timer finishes"
+          tone={preferences.timerAlarm ? 'accent' : 'fill'}
+          pressed={preferences.timerAlarm}
+          onClick={() => onUpdatePreferences({ timerAlarm: !preferences.timerAlarm })}
+        />
+        <IconButton
+          icon={Repeat}
+          label="Repeat the timer when it finishes"
+          tone={preferences.timerRepeat ? 'accent' : 'fill'}
+          pressed={preferences.timerRepeat}
+          onClick={() => onUpdatePreferences({ timerRepeat: !preferences.timerRepeat })}
+        />
       </div>
     </>
   )
@@ -78,7 +103,7 @@ export function TimerSection({
   return (
     <SectionChrome
       title="Timer"
-      pill={state.status === 'idle' ? 'Focus' : state.status}
+      pill={state.alarming ? 'Alarm' : state.status === 'idle' ? 'Focus' : state.status}
       action={
         <HeaderAction
           label={editing ? 'Done' : 'Edit Presets'}
@@ -100,7 +125,11 @@ export function TimerSection({
             <span
               aria-hidden
               className={`size-1.5 rounded-full ${
-                running ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-text-tertiary)]'
+                state.alarming
+                  ? 'bg-[var(--color-danger)]'
+                  : running
+                    ? 'bg-[var(--color-accent)]'
+                    : 'bg-[var(--color-text-tertiary)]'
               }`}
             />
             <span className="text-[length:var(--text-meta)] text-[var(--color-text-secondary)]">

@@ -22,6 +22,7 @@ const timer = (over: Partial<TimerState> = {}): TimerState => ({
   configuredDurationMs: 300_000,
   deadlineAt: Date.now() + 125_000,
   remainingMs: 125_000,
+  alarming: false,
   ...over
 })
 

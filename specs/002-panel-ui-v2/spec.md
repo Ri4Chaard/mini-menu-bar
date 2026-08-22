@@ -238,6 +238,32 @@ FR-040) so the two specifications can be read side by side without collision.
 - **FR-062**: Duration presets MUST be shown as a row of chips with the currently configured one
   marked active.
 - **FR-063**: Users MUST be able to add a duration preset of their own and to edit the preset list.
+- **FR-088**: The Timer footer's bell control MUST be an on/off setting governing whether reaching
+  zero is audible. When on, the app MUST sound a macOS system alert; when off, the countdown MUST
+  finish silently. The notification is shown either way — this setting governs only the sound. It
+  MUST default to on and MUST persist across restarts.
+
+  *Added 2026-08-22 (amendment A-7).* The design drew the bell and repeat controls in the footer but
+  the redesign shipped them inert; FR-086 makes the new controls in the frames in-scope, so their
+  behaviour belongs in the spec rather than being decided in the code. macOS does not expose the
+  Clock app's own timer tone as a playable asset, so "the alarm sound" is the nearest system alert
+  sound.
+- **FR-089**: The Timer footer's repeat control MUST be an on/off setting governing whether reaching
+  zero immediately starts the same duration again. The app MUST report the finish on every cycle, not
+  only the first. The setting MUST be read at the moment the countdown finishes, so that toggling it
+  affects a countdown already running, and MUST default to off.
+- **FR-090**: The alarm MUST continue sounding until it is dismissed. It MUST NOT stop after a fixed
+  number of rings or a fixed time — an alarm that gives up while the user is out of the room has
+  failed at the one thing it is for. The Timer MUST offer a dismiss action while the alarm is
+  sounding, and dismissing MUST silence it without altering the countdown: with FR-089 on, the next
+  cycle is already running by the time the user reaches the control, and silencing must not throw
+  that countdown away. Starting or resetting the timer MUST also silence it, and the finish
+  notification MUST offer a third route for when the panel is closed.
+
+  *Added 2026-08-22 (amendment A-8).* FR-088 originally bounded the alarm to a small fixed number of
+  rings, reasoning that a panel which dismisses on focus loss has nowhere to put a Stop control. The
+  user asked for the opposite and the reasoning was wrong: the panel reopens from the tray, so the
+  control has somewhere to live after all.
 
 #### Spotify section
 

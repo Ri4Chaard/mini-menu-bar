@@ -100,6 +100,7 @@ export function registerIpcHandlers(services: AppServices): void {
     [INVOKE_CHANNELS.timerPause]: () => need(services.timer, 'Timer').pause(),
     [INVOKE_CHANNELS.timerResume]: () => need(services.timer, 'Timer').resume(),
     [INVOKE_CHANNELS.timerReset]: () => need(services.timer, 'Timer').reset(),
+    [INVOKE_CHANNELS.timerDismissAlarm]: () => need(services.timer, 'Timer').dismissAlarm(),
 
     // ---- Spotify -----------------------------------------------------------
     [INVOKE_CHANNELS.spotifyGet]: () => need(services.playback, 'Spotify').get(),

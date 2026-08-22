@@ -46,6 +46,14 @@ export interface HostBridge {
   pauseTimer(): Promise<TimerState>
   resumeTimer(): Promise<TimerState>
   resetTimer(): Promise<TimerState>
+  /**
+   * Silence the finish alarm without touching the countdown.
+   *
+   * Separate from reset on purpose: with repeat on, the next cycle is already
+   * running by the time the user reaches for Dismiss, and silencing it should
+   * not throw that countdown away.
+   */
+  dismissTimerAlarm(): Promise<TimerState>
   onTimerStateChanged(cb: (state: TimerState) => void): Unsubscribe
 
   // ---- Spotify (FR-021..FR-025) --------------------------------------------

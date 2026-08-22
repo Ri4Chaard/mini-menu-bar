@@ -18,12 +18,26 @@ import type { TimerState } from '@shared/types'
 
 export interface TimerDeps {
   now(): number
-  notify(): void
+  /** Announce the finish. Returns true if an alarm is now ringing (FR-090). */
+  notify(): boolean | void
+  /** Silence a ringing alarm. Optional: a caller with no alarm need not say so. */
+  silence?(): void
+  /**
+   * Whether reaching zero starts the same duration again (FR-089).
+   *
+   * A getter, not a flag: the preference can change while a countdown is
+   * already running, and reading it at the moment of finishing is what makes
+   * the switch take effect on the timer in front of you rather than the next
+   * one. Optional so callers that never repeat need not say so.
+   */
+  repeat?(): boolean
 }
 
 export interface TimerService {
   get(): TimerState
   start(durationMs: number): TimerState
+  /** Silence the finish alarm, leaving the countdown itself alone (FR-090). */
+  dismissAlarm(): TimerState
   pause(): TimerState
   resume(): TimerState
   reset(): TimerState
@@ -43,6 +57,7 @@ export function createTimerService(deps: TimerDeps): TimerService {
   let deadlineAt: number | null = null
   let frozenRemainingMs = DEFAULT_DURATION
   let notified = false
+  let alarming = false
 
   const listeners = new Set<(state: TimerState) => void>()
   let tick: ReturnType<typeof setInterval> | null = null
@@ -57,8 +72,15 @@ export function createTimerService(deps: TimerDeps): TimerService {
     status,
     configuredDurationMs,
     deadlineAt: status === 'running' ? deadlineAt : null,
-    remainingMs: remaining()
+    remainingMs: remaining(),
+    alarming
   })
+
+  const silence = (): void => {
+    if (!alarming) return
+    alarming = false
+    deps.silence?.()
+  }
 
   const emit = (): void => {
     const state = snapshot()
@@ -76,6 +98,29 @@ export function createTimerService(deps: TimerDeps): TimerService {
     }
   }
 
+  /**
+   * Put the countdown into the running state. Shared by `start` and by the
+   * repeat path, so a repeated cycle is indistinguishable from a fresh start -
+   * including resetting `notified`, without which the second cycle would reach
+   * zero in silence.
+   *
+   * `silenceAlarm` is what separates the two callers. Starting a countdown by
+   * hand means you have seen the alarm, so it stops. A repeat has not been
+   * seen by anyone, so it must not silence itself - that would turn
+   * "ring until dismissed" into "ring until the next cycle begins" whenever
+   * both toggles are on.
+   */
+  const begin = (durationMs: number, silenceAlarm = true): void => {
+    if (silenceAlarm) silence()
+    configuredDurationMs = durationMs
+    frozenRemainingMs = durationMs
+    deadlineAt = deps.now() + durationMs
+    status = 'running'
+    notified = false
+    scheduleTimers()
+    emit()
+  }
+
   const finish = (): void => {
     if (status === 'finished') return
     status = 'finished'
@@ -84,9 +129,17 @@ export function createTimerService(deps: TimerDeps): TimerService {
     clearTimers()
     if (!notified) {
       notified = true
-      deps.notify()
+      alarming = deps.notify() === true
     }
     emit()
+
+    // Repeat AFTER the finished state has been emitted. The tray and the
+    // readout both see zero, so a repeating countdown still shows that it
+    // completed instead of silently snapping back to the full duration.
+    //
+    // The guard is not defensive dressing: a zero-length duration would make
+    // this restart, immediately expire and restart again without ever yielding.
+    if (deps.repeat?.() === true && configuredDurationMs > 0) begin(configuredDurationMs, false)
   }
 
   /** Settle any deadline that has already passed, e.g. after sleep. */
@@ -119,13 +172,7 @@ export function createTimerService(deps: TimerDeps): TimerService {
     },
 
     start(durationMs) {
-      configuredDurationMs = durationMs
-      frozenRemainingMs = durationMs
-      deadlineAt = deps.now() + durationMs
-      status = 'running'
-      notified = false
-      scheduleTimers()
-      emit()
+      begin(durationMs)
       return snapshot()
     },
 
@@ -150,11 +197,24 @@ export function createTimerService(deps: TimerDeps): TimerService {
     },
 
     reset() {
+      silence()
       status = 'idle'
       deadlineAt = null
       frozenRemainingMs = configuredDurationMs
       notified = false
       clearTimers()
+      emit()
+      return snapshot()
+    },
+
+    dismissAlarm() {
+      // Reconcile first, like get() and toggle(). Without it a deadline that
+      // passed while nothing was observing would be settled by this very call
+      // AFTER the alarming check, so Dismiss would arm the alarm it was asked
+      // to silence.
+      reconcile()
+      if (!alarming) return snapshot()
+      silence()
       emit()
       return snapshot()
     },
@@ -182,6 +242,7 @@ export function createTimerService(deps: TimerDeps): TimerService {
     },
 
     stop() {
+      silence()
       clearTimers()
       listeners.clear()
     }

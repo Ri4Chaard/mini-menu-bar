@@ -72,3 +72,49 @@ describe('preference revival', () => {
     expect(revivePreferences({ lastSection: 'spotify' }).lastSection).toBe('spotify')
   })
 })
+
+/**
+ * FR-088, FR-089. Both live in preferences rather than behind a bridge method,
+ * because the main process reads them at the moment the countdown finishes -
+ * which is what lets either take effect on the timer already running.
+ */
+describe('timer alarm and repeat', () => {
+  it('alarms by default and does not repeat by default', () => {
+    // A countdown you have to watch is not a countdown; a timer that restarts
+    // itself unasked is one that never stops.
+    expect(DEFAULT_PREFERENCES.timerAlarm).toBe(true)
+    expect(DEFAULT_PREFERENCES.timerRepeat).toBe(false)
+  })
+
+  it('keeps the two independent', () => {
+    const off = mergePreferences(DEFAULT_PREFERENCES, { timerAlarm: false })
+    expect(off.timerAlarm).toBe(false)
+    expect(off.timerRepeat).toBe(DEFAULT_PREFERENCES.timerRepeat)
+
+    const both = mergePreferences(off, { timerRepeat: true })
+    expect(both.timerRepeat).toBe(true)
+    expect(both.timerAlarm).toBe(false)
+  })
+
+  it('survives a round trip through the store', () => {
+    const written = mergePreferences(DEFAULT_PREFERENCES, { timerAlarm: false, timerRepeat: true })
+    const read = revivePreferences(JSON.parse(JSON.stringify(written)))
+    expect(read.timerAlarm).toBe(false)
+    expect(read.timerRepeat).toBe(true)
+  })
+
+  it('falls back to the defaults when the stored values are not booleans', () => {
+    const read = revivePreferences({ timerAlarm: 'yes', timerRepeat: 1 })
+    expect(read.timerAlarm).toBe(DEFAULT_PREFERENCES.timerAlarm)
+    expect(read.timerRepeat).toBe(DEFAULT_PREFERENCES.timerRepeat)
+  })
+
+  it('adopts the defaults for preferences written before these existed', () => {
+    const legacy = { ...DEFAULT_PREFERENCES } as Record<string, unknown>
+    delete legacy.timerAlarm
+    delete legacy.timerRepeat
+    const read = revivePreferences(legacy)
+    expect(read.timerAlarm).toBe(true)
+    expect(read.timerRepeat).toBe(false)
+  })
+})

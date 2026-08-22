@@ -54,6 +54,18 @@ export interface TimerState {
   /** Epoch ms. Non-null exactly when status === 'running'. */
   deadlineAt: number | null
   remainingMs: number
+  /**
+   * True while the finish alarm is still sounding (FR-090).
+   *
+   * Part of the timer's state rather than a separate stream because it is the
+   * timer that is alarming, and because the panel has to know without asking:
+   * the Dismiss control only exists while this is true.
+   *
+   * Independent of `status`. Repeat can start the next countdown while the
+   * previous alarm is still ringing, so 'running' with `alarming` is a real
+   * combination, not a contradiction.
+   */
+  alarming: boolean
 }
 
 export interface Note {
@@ -118,6 +130,20 @@ export interface Preferences {
    */
   timerPresets: number[]
   timerShortcut: string | null
+  /**
+   * Whether reaching zero makes a sound (FR-088).
+   *
+   * On by default, because a countdown you have to watch is not a countdown.
+   * The notification is shown either way - this governs only the audio.
+   */
+  timerAlarm: boolean
+  /**
+   * Whether reaching zero starts the same duration again immediately (FR-089).
+   *
+   * Off by default: a timer that restarts itself unasked is a timer that never
+   * stops, and the user has to be the one who chose that.
+   */
+  timerRepeat: boolean
   /** Epoch ms. Only ever moves forward. Screenshots at or before this are seen. */
   screenshotsSeenWatermark: number
 }
@@ -133,6 +159,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   timerDurationMs: 5 * 60 * 1000,
   timerPresets: [60_000, 300_000, 600_000, 1_500_000],
   timerShortcut: 'Control+Option+T',
+  timerAlarm: true,
+  timerRepeat: false,
   screenshotsSeenWatermark: 0
 }
 

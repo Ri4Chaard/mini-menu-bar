@@ -117,7 +117,8 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
     status: 'idle',
     configuredDurationMs: prefs.timerDurationMs,
     deadlineAt: null,
-    remainingMs: prefs.timerDurationMs
+    remainingMs: prefs.timerDurationMs,
+    alarming: false
   }
   let tickHandle: ReturnType<typeof setInterval> | null = null
 
@@ -130,9 +131,35 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
   const emitTimer = (): void => {
     const state = projectTimer()
     if (state.status === 'running' && state.remainingMs === 0) {
-      timer = { ...timer, status: 'finished', deadlineAt: null, remainingMs: 0 }
+      // The browser cannot make the sound, but it MUST reach the alarming
+      // state: otherwise Dismiss is unreachable in browser mode and the one
+      // control added for it cannot be exercised there at all (Principle I).
+      timer = {
+        ...timer,
+        status: 'finished',
+        deadlineAt: null,
+        remainingMs: 0,
+        alarming: prefs.timerAlarm
+      }
       stopTicking()
       for (const cb of timerListeners) cb({ ...timer })
+
+      // Repeat is mirrored here, not left to the host: it changes what the
+      // countdown DOES, so a browser session where the toggle did nothing would
+      // not be running the same timer (Principle I). The alarm is not mirrored -
+      // there is no browser equivalent of a system alert sound.
+      if (prefs.timerRepeat && timer.configuredDurationMs > 0) {
+        timer = {
+          status: 'running',
+          configuredDurationMs: timer.configuredDurationMs,
+          deadlineAt: Date.now() + timer.configuredDurationMs,
+          remainingMs: timer.configuredDurationMs,
+          // Not cleared: a repeat nobody has seen must not silence itself.
+          alarming: timer.alarming
+        }
+        startTicking()
+        for (const cb of timerListeners) cb({ ...timer })
+      }
       return
     }
     for (const cb of timerListeners) cb(state)
@@ -277,12 +304,20 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
     async getTimerState() {
       return projectTimer()
     },
+    async dismissTimerAlarm() {
+      if (timer.alarming) {
+        timer = { ...timer, alarming: false }
+        emitTimer()
+      }
+      return projectTimer()
+    },
     async startTimer(durationMs) {
       timer = {
         status: 'running',
         configuredDurationMs: durationMs,
         deadlineAt: Date.now() + durationMs,
-        remainingMs: durationMs
+        remainingMs: durationMs,
+        alarming: false
       }
       prefs = { ...prefs, timerDurationMs: durationMs }
       startTicking()
@@ -307,7 +342,9 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
         status: 'idle',
         configuredDurationMs: timer.configuredDurationMs,
         deadlineAt: null,
-        remainingMs: timer.configuredDurationMs
+        remainingMs: timer.configuredDurationMs,
+        // Reset is the "everything off" action, alarm included.
+        alarming: false
       }
       return { ...timer }
     },

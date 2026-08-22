@@ -92,7 +92,11 @@ async function bootstrap(): Promise<void> {
     const playback = createPlaybackService()
     const timer = createTimerService({
       now: () => Date.now(),
-      notify: () => notifications.timerFinished()
+      // Both read at the moment of finishing rather than captured here, so
+      // toggling the bell or repeat affects the countdown already running.
+      notify: () => notifications.timerFinished({ alarm: preferences.get().timerAlarm }),
+      silence: () => notifications.stopAlarm(),
+      repeat: () => preferences.get().timerRepeat
     })
     const shortcuts = createShortcutService(preferences, () => {
       const state = timer.toggle()

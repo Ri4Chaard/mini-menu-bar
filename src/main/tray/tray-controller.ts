@@ -32,6 +32,7 @@ export function createTrayController(deps: TrayDeps): TrayController {
   const { tray, preferences, screenshots, defaultImage } = deps
 
   let timer: TimerState = {
+    alarming: false,
     status: 'idle',
     configuredDurationMs: DEFAULT_PREFERENCES.timerDurationMs,
     deadlineAt: null,

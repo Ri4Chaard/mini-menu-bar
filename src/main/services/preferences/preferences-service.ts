@@ -45,6 +45,8 @@ export function revivePreferences(raw: unknown): Preferences {
       r.timerShortcut === null || typeof r.timerShortcut === 'string'
         ? (r.timerShortcut as string | null)
         : DEFAULT_PREFERENCES.timerShortcut,
+    timerAlarm: reviveBoolean(r.timerAlarm, DEFAULT_PREFERENCES.timerAlarm),
+    timerRepeat: reviveBoolean(r.timerRepeat, DEFAULT_PREFERENCES.timerRepeat),
     screenshotsSeenWatermark: reviveNumber(r.screenshotsSeenWatermark, 0)
   }
 }

@@ -21,6 +21,7 @@ export const INVOKE_CHANNELS = {
   timerPause: 'timer:pause',
   timerResume: 'timer:resume',
   timerReset: 'timer:reset',
+  timerDismissAlarm: 'timer:dismiss-alarm',
 
   spotifyGet: 'spotify:get',
   spotifyToggle: 'spotify:toggle',

@@ -19,6 +19,7 @@ const CONTRACT_METHODS: (keyof HostBridge)[] = [
   'onScreenshotsChanged', 'getScreenshotSourceError', 'copyScreenshots', 'deleteScreenshots',
   'startScreenshotDrag',
   'getTimerState', 'startTimer', 'pauseTimer', 'resumeTimer', 'resetTimer', 'onTimerStateChanged',
+  'dismissTimerAlarm',
   'getPlaybackState', 'togglePlayPause', 'nextTrack', 'previousTrack', 'seekTo', 'onPlaybackStateChanged',
   'setVolume', 'setShuffle', 'setRepeat',
   'listNotes', 'createNote', 'updateNote', 'deleteNote', 'flushNotes',
@@ -270,6 +271,20 @@ describe('HostBridge contract — mock implementation', () => {
     })
   })
 
+  describe('the timer finish alarm (FR-090)', () => {
+    it('exposes dismissal as its own operation, not as a reset', () => {
+      // Dismissing must not throw away a countdown that repeat has already
+      // restarted, which is exactly what reset would do.
+      expect(host.dismissTimerAlarm).not.toBe(host.resetTimer)
+    })
+
+    it('is a no-op when nothing is ringing', async () => {
+      const state = await host.dismissTimerAlarm()
+      expect(state.alarming).toBe(false)
+      expect(state.status).toBe('idle')
+    })
+  })
+
   describe('dragging screenshots out', () => {
     it('carries exactly the ids it was given', async () => {
       const [first, second] = await host.listScreenshots()
@@ -437,6 +452,11 @@ describe('HostBridge contract — real implementation wiring', () => {
   it('sends ids rather than filesystem paths for screenshot actions', async () => {
     await real.openScreenshot('some-id')
     expect(invoke).toHaveBeenCalledWith(INVOKE_CHANNELS.screenshotsOpen, { id: 'some-id' })
+  })
+
+  it('dismisses the alarm through its own enumerated channel', async () => {
+    await real.dismissTimerAlarm()
+    expect(invoke).toHaveBeenCalledWith(INVOKE_CHANNELS.timerDismissAlarm, undefined)
   })
 
   it('starts a drag by id, so the renderer never names a file', async () => {

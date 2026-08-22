@@ -8,13 +8,17 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createTimerService } from '../../src/main/services/timer/timer-service'
 
-function harness(start = 1_000_000) {
+function harness(start = 1_000_000, repeat?: () => boolean) {
   let now = start
-  const notify = vi.fn()
-  const service = createTimerService({ now: () => now, notify })
+  // Returning true is what a real notifier does when an alarm starts ringing;
+  // the service takes that as the signal to enter the alarming state.
+  const notify = vi.fn(() => true)
+  const silence = vi.fn()
+  const service = createTimerService({ now: () => now, notify, silence, repeat })
   return {
     service,
     notify,
+    silence,
     advance(ms: number) {
       now += ms
     },
@@ -148,5 +152,170 @@ describe('timer state machine', () => {
     off()
     h.service.pause()
     expect(cb).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * FR-089. Repeat is read at the moment of finishing rather than captured at
+ * start, so the switch applies to the countdown in front of you.
+ */
+describe('repeat on finish', () => {
+  it('starts the same duration again when repeat is on', () => {
+    const h = harness(1_000_000, () => true)
+    h.service.start(60_000)
+    h.advance(60_000)
+
+    const state = h.service.get()
+    expect(state.status).toBe('running')
+    expect(state.remainingMs).toBe(60_000)
+    expect(state.deadlineAt).toBe(h.now + 60_000)
+  })
+
+  it('stays finished when repeat is off', () => {
+    const h = harness(1_000_000, () => false)
+    h.service.start(60_000)
+    h.advance(60_000)
+    expect(h.service.get().status).toBe('finished')
+  })
+
+  it('stays finished when no repeat getter was supplied at all', () => {
+    const h = harness()
+    h.service.start(60_000)
+    h.advance(60_000)
+    expect(h.service.get().status).toBe('finished')
+  })
+
+  it('notifies on every cycle, not only the first', () => {
+    // The second cycle reaching zero in silence is the bug this guards: the
+    // notified flag has to be cleared by the restart, not just by reset().
+    const h = harness(1_000_000, () => true)
+    h.service.start(60_000)
+    h.advance(60_000)
+    h.service.get()
+    expect(h.notify).toHaveBeenCalledTimes(1)
+
+    h.advance(60_000)
+    h.service.get()
+    expect(h.notify).toHaveBeenCalledTimes(2)
+  })
+
+  it('takes effect on a countdown that was already running', () => {
+    let repeating = false
+    const h = harness(1_000_000, () => repeating)
+    h.service.start(60_000)
+    repeating = true
+    h.advance(60_000)
+    expect(h.service.get().status).toBe('running')
+  })
+
+  it('can still be reset out of a repeating cycle', () => {
+    const h = harness(1_000_000, () => true)
+    h.service.start(60_000)
+    h.advance(60_000)
+    h.service.get()
+    expect(h.service.reset().status).toBe('idle')
+  })
+
+  it('keeps the configured duration across a repeat', () => {
+    const h = harness(1_000_000, () => true)
+    h.service.start(25 * 60_000)
+    h.advance(25 * 60_000)
+    expect(h.service.get().configuredDurationMs).toBe(25 * 60_000)
+  })
+})
+
+/**
+ * FR-090. The alarm rings until dismissed, and dismissing it is not the same
+ * as resetting the countdown.
+ */
+describe('the finish alarm', () => {
+  it('enters the alarming state when the notifier starts ringing', () => {
+    const h = harness()
+    h.service.start(60_000)
+    h.advance(60_000)
+    expect(h.service.get().alarming).toBe(true)
+  })
+
+  it('does not alarm when the notifier reports no sound', () => {
+    let now = 1_000_000
+    const service = createTimerService({ now: () => now, notify: () => false })
+    service.start(60_000)
+    now += 60_000
+    expect(service.get().alarming).toBe(false)
+  })
+
+  it('stays ringing indefinitely until something stops it', () => {
+    const h = harness()
+    h.service.start(60_000)
+    h.advance(60_000)
+    h.service.get()
+    h.advance(60 * 60_000)
+    expect(h.service.get().alarming).toBe(true)
+    expect(h.silence).not.toHaveBeenCalled()
+  })
+
+  it('is silenced by dismissAlarm without disturbing the countdown state', () => {
+    const h = harness()
+    h.service.start(60_000)
+    h.advance(60_000)
+    const after = h.service.dismissAlarm()
+    expect(after.alarming).toBe(false)
+    expect(after.status).toBe('finished')
+    expect(h.silence).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats dismissing nothing as a no-op rather than an error', () => {
+    const h = harness()
+    expect(h.service.dismissAlarm().status).toBe('idle')
+    expect(h.silence).not.toHaveBeenCalled()
+  })
+
+  it('is silenced by reset', () => {
+    const h = harness()
+    h.service.start(60_000)
+    h.advance(60_000)
+    h.service.get()
+    expect(h.service.reset().alarming).toBe(false)
+    expect(h.silence).toHaveBeenCalledTimes(1)
+  })
+
+  it('is silenced by starting a new countdown, which the user has clearly seen', () => {
+    const h = harness()
+    h.service.start(60_000)
+    h.advance(60_000)
+    h.service.get()
+    expect(h.service.start(30_000).alarming).toBe(false)
+    expect(h.silence).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps ringing through a repeat, which nobody has seen', () => {
+    // Otherwise "ring until dismissed" quietly becomes "ring until the next
+    // cycle starts" whenever both toggles are on.
+    const h = harness(1_000_000, () => true)
+    h.service.start(60_000)
+    h.advance(60_000)
+    const state = h.service.get()
+    expect(state.status).toBe('running')
+    expect(state.alarming).toBe(true)
+    expect(h.silence).not.toHaveBeenCalled()
+  })
+
+  it('leaves a repeated countdown running when the alarm is dismissed', () => {
+    const h = harness(1_000_000, () => true)
+    h.service.start(60_000)
+    h.advance(60_000)
+    h.service.get()
+    const after = h.service.dismissAlarm()
+    expect(after.alarming).toBe(false)
+    expect(after.status).toBe('running')
+  })
+
+  it('silences the alarm when the service is torn down', () => {
+    const h = harness()
+    h.service.start(60_000)
+    h.advance(60_000)
+    h.service.get()
+    h.service.stop()
+    expect(h.silence).toHaveBeenCalledTimes(1)
   })
 })
