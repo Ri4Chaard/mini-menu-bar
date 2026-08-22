@@ -214,6 +214,15 @@ persisted, edit it, then delete it.
   configured location.
 - **FR-014a**: The app MUST treat screenshot files as read-only. It MUST NOT move, rename, copy,
   delete, or otherwise modify them, and MUST NOT change the system screenshot save location.
+
+  > **Amended 2026-08-22 by feature 002 (amendment A-4).** Feature 002's FR-058 adds user-initiated
+  > Copy and Delete, which this requirement as originally written forbids. The requirement is
+  > narrowed, not dropped: **the app still never touches a screenshot file on its own initiative.**
+  > The indexing path — watching, reading metadata, building thumbnails — remains strictly read-only.
+  > Only an explicit click on Copy or Delete may act on a file, Delete moves it to the Trash rather
+  > than unlinking it, and the app still never changes the system save location. See
+  > `specs/002-panel-ui-v2/spec.md` FR-058 and `tests/unit/screenshots-readonly.spec.ts`, which
+  > asserts both halves.
 - **FR-014b**: The app MUST follow the system screenshot save location if the user changes it, and
   MUST reflect that change without needing a restart.
 - **FR-015**: The app MUST handle an unavailable or unreadable screenshot source by explaining the

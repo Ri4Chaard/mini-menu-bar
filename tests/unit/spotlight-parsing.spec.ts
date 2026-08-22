@@ -42,7 +42,7 @@ describe('Spotify state parsing', () => {
   const line = (...parts: string[]): string => parts.join(FIELD_SEP)
 
   it('parses a normal playing state', () => {
-    const state = parseStateOutput(line('playing', 'Dying', 'Cold Hart', '209583', '98248'))
+    const { state } = parseStateOutput(line('playing', 'Dying', 'Cold Hart', '209583', '98248'))
     expect(state).toMatchObject({
       availability: 'playing',
       trackName: 'Dying',
@@ -56,31 +56,31 @@ describe('Spotify state parsing', () => {
     // AppleScript formats numbers using the user's locale. On a Ukrainian or
     // German system `player position` comes back as "98,248" - which Number()
     // reads as NaN, blanking the entire playback state.
-    const state = parseStateOutput(line('playing', 'Dying', 'Cold Hart', '209583', '98,248'))
+    const { state } = parseStateOutput(line('playing', 'Dying', 'Cold Hart', '209583', '98,248'))
     expect(state.positionMs).toBe(98)
     expect(state.trackName).toBe('Dying')
     expect(state.availability).toBe('playing')
   })
 
   it('reports stopped without inventing track data', () => {
-    const state = parseStateOutput('stopped')
+    const { state } = parseStateOutput('stopped')
     expect(state.availability).toBe('stopped')
     expect(state.trackName).toBeNull()
     expect(state.positionMs).toBeNull()
   })
 
   it('clamps position to duration', () => {
-    const state = parseStateOutput(line('playing', 'X', 'Y', '1000', '99999'))
+    const { state } = parseStateOutput(line('playing', 'X', 'Y', '1000', '99999'))
     expect(state.positionMs).toBeLessThanOrEqual(state.durationMs!)
   })
 
   it('treats a truncated response as stopped rather than throwing', () => {
-    expect(parseStateOutput(line('playing', 'X')).availability).toBe('stopped')
-    expect(parseStateOutput('').availability).toBe('stopped')
+    expect(parseStateOutput(line('playing', 'X')).state.availability).toBe('stopped')
+    expect(parseStateOutput('').state.availability).toBe('stopped')
   })
 
   it('preserves a track name containing a comma', () => {
-    const state = parseStateOutput(line('paused', 'Hello, Goodbye', 'The Beatles', '203000', '1000'))
+    const { state } = parseStateOutput(line('paused', 'Hello, Goodbye', 'The Beatles', '203000', '1000'))
     expect(state.trackName).toBe('Hello, Goodbye')
     expect(state.availability).toBe('paused')
   })

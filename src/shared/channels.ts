@@ -12,6 +12,8 @@ export const INVOKE_CHANNELS = {
   screenshotsReveal: 'screenshots:reveal',
   screenshotsMarkSeen: 'screenshots:mark-seen',
   screenshotsSourceError: 'screenshots:source-error',
+  screenshotsCopy: 'screenshots:copy',
+  screenshotsDelete: 'screenshots:delete',
 
   timerGet: 'timer:get',
   timerStart: 'timer:start',
@@ -25,6 +27,9 @@ export const INVOKE_CHANNELS = {
   spotifyPrevious: 'spotify:previous',
   spotifySeek: 'spotify:seek',
   spotifySubscribe: 'spotify:subscribe',
+  spotifySetVolume: 'spotify:set-volume',
+  spotifySetShuffle: 'spotify:set-shuffle',
+  spotifySetRepeat: 'spotify:set-repeat',
 
   notesList: 'notes:list',
   notesCreate: 'notes:create',
@@ -36,7 +41,9 @@ export const INVOKE_CHANNELS = {
   prefsUpdate: 'prefs:update',
   prefsSetShortcut: 'prefs:set-shortcut',
 
-  panelClose: 'panel:close'
+  panelClose: 'panel:close',
+
+  appQuit: 'app:quit'
 } as const
 
 export const EVENT_CHANNELS = {

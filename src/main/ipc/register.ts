@@ -10,7 +10,7 @@
  * a section whose story has not landed yet reports a clear message rather than
  * crashing the process.
  */
-import { ipcMain } from 'electron'
+import { app, ipcMain } from 'electron'
 import { BridgeError, serializeError } from '@shared/errors'
 import { INVOKE_CHANNELS, type InvokeChannel } from '@shared/channels'
 import {
@@ -20,10 +20,12 @@ import {
   requireNullableString,
   requirePositiveDuration,
   requireFiniteNumber,
+  requireIdArray,
   requireObject,
-  requireString
+  requireString,
+  requireVolume
 } from './validate'
-import type { Preferences } from '@shared/types'
+import { MAX_SCREENSHOTS, type Preferences } from '@shared/types'
 import type { PreferencesService } from '../services/preferences/preferences-service'
 import type { ScreenshotService } from '../services/screenshots/screenshot-store'
 import type { TimerService } from '../services/timer/timer-service'
@@ -63,6 +65,11 @@ export function registerIpcHandlers(services: AppServices): void {
     [INVOKE_CHANNELS.screenshotsMarkSeen]: () => need(services.screenshots, 'Screenshots').markSeen(),
     [INVOKE_CHANNELS.screenshotsSourceError]: () =>
       need(services.screenshots, 'Screenshots').sourceError(),
+    [INVOKE_CHANNELS.screenshotsCopy]: (p) =>
+      // Ids, not paths - main resolves them against its own store.
+      need(services.screenshots, 'Screenshots').copy(requireIdArray(p, MAX_SCREENSHOTS)),
+    [INVOKE_CHANNELS.screenshotsDelete]: (p) =>
+      need(services.screenshots, 'Screenshots').remove(requireIdArray(p, MAX_SCREENSHOTS)),
 
     // ---- Timer -------------------------------------------------------------
     [INVOKE_CHANNELS.timerGet]: () => need(services.timer, 'Timer').get(),
@@ -86,6 +93,12 @@ export function registerIpcHandlers(services: AppServices): void {
     },
     [INVOKE_CHANNELS.spotifySubscribe]: (p) =>
       need(services.playback, 'Spotify').setSubscribed(requireBoolean(p, 'active')),
+    [INVOKE_CHANNELS.spotifySetVolume]: (p) =>
+      need(services.playback, 'Spotify').setVolume(requireVolume(p)),
+    [INVOKE_CHANNELS.spotifySetShuffle]: (p) =>
+      need(services.playback, 'Spotify').setShuffle(requireBoolean(p, 'shuffling')),
+    [INVOKE_CHANNELS.spotifySetRepeat]: (p) =>
+      need(services.playback, 'Spotify').setRepeat(requireBoolean(p, 'repeating')),
 
     // ---- Notes -------------------------------------------------------------
     [INVOKE_CHANNELS.notesList]: () => need(services.notes, 'Notes').list(),
@@ -104,7 +117,14 @@ export function registerIpcHandlers(services: AppServices): void {
       need(services.shortcuts, 'Shortcuts').rebind(requireNullableString(p, 'accelerator')),
 
     // ---- Panel -------------------------------------------------------------
-    [INVOKE_CHANNELS.panelClose]: () => services.panel.close()
+    [INVOKE_CHANNELS.panelClose]: () => services.panel.close(),
+
+    // ---- App ---------------------------------------------------------------
+    // The app is an accessory (LSUIElement): no Dock icon, no application
+    // menu, so without this channel there is no way out but Activity Monitor
+    // (research.md R-113). No confirmation, matching every other menu bar
+    // utility.
+    [INVOKE_CHANNELS.appQuit]: () => app.quit()
   }
 
   for (const [channel, handler] of Object.entries(handlers)) {

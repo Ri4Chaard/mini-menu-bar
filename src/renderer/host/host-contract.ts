@@ -25,6 +25,10 @@ export interface HostBridge {
   markScreenshotsSeen(): Promise<void>
   onScreenshotsChanged(cb: (entries: ScreenshotEntry[]) => void): Unsubscribe
   getScreenshotSourceError(): Promise<SourceError | null>
+  /** One id copies the image itself; several copy file references (R-107). */
+  copyScreenshots(ids: string[]): Promise<void>
+  /** Moves to the Trash, never unlink - deletion stays recoverable (R-108). */
+  deleteScreenshots(ids: string[]): Promise<void>
 
   // ---- Timer (FR-016..FR-020) ----------------------------------------------
   getTimerState(): Promise<TimerState>
@@ -41,6 +45,15 @@ export interface HostBridge {
   previousTrack(): Promise<void>
   seekTo(positionMs: number): Promise<void>
   onPlaybackStateChanged(cb: (state: PlaybackState) => void): Unsubscribe
+  /** Integer 0-100. Callers commit on release, not per pointer-move (R-117). */
+  setVolume(volume: number): Promise<void>
+  setShuffle(shuffling: boolean): Promise<void>
+  /**
+   * A toggle, NOT a three-state cycle: Spotify's `repeating` property is a
+   * boolean and the off/all/one cycle in its own UI is not scriptable
+   * (research.md R-109, FR-068 as amended).
+   */
+  setRepeat(repeating: boolean): Promise<void>
 
   // ---- Notes (FR-026..FR-027) ----------------------------------------------
   listNotes(): Promise<Note[]>
@@ -57,6 +70,10 @@ export interface HostBridge {
   // ---- Panel (FR-002) ------------------------------------------------------
   closePanel(): Promise<void>
   onPanelShown(cb: () => void): Unsubscribe
+
+  // ---- App (FR-076) --------------------------------------------------------
+  /** Never resolves in the host: the process exits (research.md R-113). */
+  quitApp(): Promise<void>
 
   // ---- Environment ---------------------------------------------------------
   getEnvironment(): 'electron' | 'browser'

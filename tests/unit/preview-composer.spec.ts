@@ -29,6 +29,10 @@ const playback = (over: Partial<PlaybackState> = {}): PlaybackState => ({
   availability: 'playing',
   trackName: 'Teardrop',
   artist: 'Massive Attack',
+  volume: 65,
+  shuffling: false,
+  repeating: false,
+  artworkDataUrl: null,
   positionMs: 1000,
   durationMs: 330_000,
   ...over

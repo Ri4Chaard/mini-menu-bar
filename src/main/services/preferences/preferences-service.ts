@@ -12,6 +12,7 @@ import {
   type Preferences,
   type SectionId
 } from '@shared/types'
+import { normalisePresets } from './normalise-presets'
 
 function reviveSection(value: unknown): SectionId {
   // An unknown value falls back rather than rendering an empty panel.
@@ -37,6 +38,9 @@ export function revivePreferences(raw: unknown): Preferences {
     },
     lastSection: reviveSection(r.lastSection),
     timerDurationMs: Math.max(1, reviveNumber(r.timerDurationMs, DEFAULT_PREFERENCES.timerDurationMs)),
+    // Repaired on READ as well as write: the array on disk is user data now
+    // (FR-063) and a malformed one must not make preferences unloadable.
+    timerPresets: normalisePresets(r.timerPresets as number[] | undefined),
     timerShortcut:
       r.timerShortcut === null || typeof r.timerShortcut === 'string'
         ? (r.timerShortcut as string | null)
@@ -64,6 +68,10 @@ export function mergePreferences(current: Preferences, patch: Partial<Preference
       spotify: patch.previews?.spotify ?? current.previews.spotify
     }
   }
+  // Presets are normalised on every write, never rejected - a bad list is
+  // repaired rather than making preferences unwritable (data-model.md).
+  next.timerPresets = normalisePresets(next.timerPresets)
+
   // The watermark only ever moves forward (data-model.md).
   next.screenshotsSeenWatermark = Math.max(
     current.screenshotsSeenWatermark,

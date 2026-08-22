@@ -67,6 +67,14 @@ export interface MockControls {
   setPlaybackAvailability(availability: PlaybackState['availability']): void
   /** Make the next screenshot open/reveal fail with FILE_NOT_FOUND. */
   setNextFileMissing(missing: boolean): void
+  /** Which clipboard flavour the last copy chose, so R-107 is assertable. */
+  lastClipboardMode(): 'image' | 'references' | null
+  /** Make every delete fail, so the all-failed path is reachable (Principle I). */
+  setDeleteFails(fails: boolean): void
+  /** Blank the artwork so the placeholder path is exercisable (R-111). */
+  setArtworkMissing(missing: boolean): void
+  /** True once quitApp was called - the mock cannot actually exit. */
+  didQuit(): boolean
 }
 
 export function createMockBridge(): HostBridge & { __mock: MockControls } {
@@ -74,6 +82,10 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
   let screenshots = seedScreenshots(now)
   let sourceError: SourceError | null = null
   let nextFileMissing = false
+  let clipboardMode: 'image' | 'references' | null = null
+  let deleteFails = false
+  let artworkMissing = false
+  let quit = false
   let notes: Note[] = [
     { id: 'n1', content: 'Remember to check the tray truncation budget.', createdAt: now - MINUTE, updatedAt: now - MINUTE }
   ]
@@ -129,12 +141,47 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
   let availability: PlaybackState['availability'] = 'playing'
   let positionMs = 42_000
 
+  let volume = 65
+  let shuffling = false
+  let repeating = false
+
   const playback = (): PlaybackState => {
+    // Every field nulls together when playback is unavailable - a stale volume
+    // or a leftover artwork on a 'not-running' state is exactly the kind of
+    // ghost the data-model rule exists to prevent.
     if (availability === 'not-running' || availability === 'permission-denied') {
-      return { availability, trackName: null, artist: null, positionMs: null, durationMs: null }
+      return {
+        availability,
+        trackName: null,
+        artist: null,
+        positionMs: null,
+        durationMs: null,
+        volume: null,
+        shuffling: null,
+        repeating: null,
+        artworkDataUrl: null
+      }
     }
     const t = MOCK_TRACKS[trackIndex % MOCK_TRACKS.length]!
-    return { availability, trackName: t.trackName, artist: t.artist, positionMs, durationMs: t.durationMs }
+    return {
+      availability,
+      trackName: t.trackName,
+      artist: t.artist,
+      positionMs,
+      durationMs: t.durationMs,
+      volume,
+      shuffling,
+      repeating,
+      // A static inline placeholder. The mock NEVER fetches: browser mode has
+      // to work with no network at all (Principle I, R-111).
+      artworkDataUrl: artworkMissing ? null : swatch((trackIndex * 97) % 360, 'Album')
+    }
+  }
+
+  const requirePlayback = (): void => {
+    if (availability === 'not-running' || availability === 'permission-denied') {
+      throw new BridgeError('SPOTIFY_UNAVAILABLE', 'Spotify is not available.')
+    }
   }
   const emitPlayback = (): void => {
     const s = playback()
@@ -175,6 +222,25 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
     },
     async getScreenshotSourceError() {
       return sourceError
+    },
+    async copyScreenshots(ids) {
+      const live = ids.filter((id) => screenshots.some((s) => s.id === id))
+      // Copying 3 of 4 succeeds; copying 0 of 4 does not (R-107).
+      if (live.length === 0) {
+        throw new BridgeError('FILE_NOT_FOUND', 'No screenshots to copy')
+      }
+      clipboardMode = live.length === 1 ? 'image' : 'references'
+    },
+    async deleteScreenshots(ids) {
+      if (deleteFails) {
+        throw new BridgeError('FILE_NOT_FOUND', 'None of those screenshots could be deleted.')
+      }
+      const before = screenshots.length
+      screenshots = screenshots.filter((s) => !ids.includes(s.id))
+      if (screenshots.length === before) {
+        throw new BridgeError('FILE_NOT_FOUND', 'None of those screenshots could be deleted.')
+      }
+      emitScreenshots()
     },
     onScreenshotsChanged(cb) {
       screenshotListeners.add(cb)
@@ -260,6 +326,31 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
       positionMs = Math.min(Math.max(0, target), state.durationMs)
       emitPlayback()
     },
+    async setVolume(next) {
+      requirePlayback()
+      if (!Number.isInteger(next) || next < 0 || next > 100) {
+        throw new BridgeError('INVALID_ARGUMENT', 'volume must be an integer between 0 and 100')
+      }
+      volume = next
+      emitPlayback()
+    },
+    async setShuffle(next) {
+      requirePlayback()
+      if (typeof next !== 'boolean') {
+        throw new BridgeError('INVALID_ARGUMENT', 'shuffling must be a boolean')
+      }
+      shuffling = next
+      emitPlayback()
+    },
+    async setRepeat(next) {
+      requirePlayback()
+      if (typeof next !== 'boolean') {
+        throw new BridgeError('INVALID_ARGUMENT', 'repeating must be a boolean')
+      }
+      // A toggle, not a cycle: Spotify exposes only a boolean (R-109).
+      repeating = next
+      emitPlayback()
+    },
     onPlaybackStateChanged(cb) {
       playbackListeners.add(cb)
       if (playbackHandle === null) {
@@ -324,10 +415,24 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
       return () => panelListeners.delete(cb) as unknown as void
     },
 
+    async quitApp() {
+      // Cannot exit a browser tab; record it so tests can assert the call.
+      quit = true
+    },
+
     getEnvironment: () => 'browser',
     supportsNativeFeatures: () => false,
 
     __mock: {
+      lastClipboardMode: () => clipboardMode,
+      setDeleteFails(fails) {
+        deleteFails = fails
+      },
+      setArtworkMissing(missing) {
+        artworkMissing = missing
+        emitPlayback()
+      },
+      didQuit: () => quit,
       addScreenshot() {
         const n = screenshots.length + 1
         screenshots = [

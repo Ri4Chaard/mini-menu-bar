@@ -57,8 +57,11 @@ async function bootstrap(): Promise<void> {
     preloadWindow: true,
     showDockIcon: false,
     browserWindow: {
-      width: 460,
-      height: 420,
+      // Panel UI v2: the design frames are 1:1 logical points, not a 2x
+      // rendering - the 15 pt titles and the band arithmetic summing to exactly
+      // 235 both settle it (research.md R-101). Wider and much shorter than v1.
+      width: 632,
+      height: 235,
       resizable: false,
       // Required so menubar emits 'focus-lost' instead of hiding the panel on
       // its own 100 ms blur timer. Dismissal is decided in panel-window.ts.

@@ -1,6 +1,11 @@
 import type { ReactNode } from 'react'
 import { AlertTriangle, type LucideIcon } from 'lucide-react'
 
+/**
+ * Empty and error states live INSIDE the 108 pt body band, not in place of the
+ * section. The header, divider and footer stay put whatever the body has to
+ * say (FR-044, spec edge cases).
+ */
 export function EmptyState({
   icon: Icon,
   title,
@@ -11,10 +16,12 @@ export function EmptyState({
   hint?: string
 }): ReactNode {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-      <Icon className="size-7 opacity-40" aria-hidden />
-      <p className="font-medium">{title}</p>
-      {hint ? <p className="text-[color:var(--color-text-muted)]">{hint}</p> : null}
+    <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center">
+      <Icon className="size-6 text-[var(--color-text-tertiary)]" aria-hidden />
+      <p className="text-[length:var(--text-body)] font-medium text-[var(--color-text)]">{title}</p>
+      {hint ? (
+        <p className="text-[length:var(--text-micro)] text-[var(--color-text-secondary)]">{hint}</p>
+      ) : null}
     </div>
   )
 }
@@ -25,10 +32,14 @@ export function EmptyState({
  */
 export function ErrorState({ title, detail }: { title: string; detail?: string }): ReactNode {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-      <AlertTriangle className="size-7 text-[color:var(--color-danger)]" aria-hidden />
-      <p className="font-medium">{title}</p>
-      {detail ? <p className="text-[color:var(--color-text-muted)]">{detail}</p> : null}
+    <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center">
+      <AlertTriangle className="size-6 text-[var(--color-danger)]" aria-hidden />
+      <p className="text-[length:var(--text-body)] font-medium text-[var(--color-text)]">{title}</p>
+      {detail ? (
+        <p className="line-clamp-2 text-[length:var(--text-micro)] text-[var(--color-text-secondary)]">
+          {detail}
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -37,7 +48,7 @@ export function Banner({ children }: { children: ReactNode }): ReactNode {
   return (
     <div
       role="status"
-      className="mx-3 mt-2 rounded-[var(--radius-card)] border border-[color:var(--color-danger)] px-3 py-2 text-[color:var(--color-danger)]"
+      className="shrink-0 truncate rounded-[var(--radius-chip)] bg-[var(--color-danger-subtle)] px-2 py-1 text-[length:var(--text-micro)] text-[var(--color-danger)]"
     >
       {children}
     </div>

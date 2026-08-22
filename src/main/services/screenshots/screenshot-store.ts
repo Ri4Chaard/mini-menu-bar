@@ -10,6 +10,7 @@ import { shell } from 'electron'
 import { BridgeError } from '@shared/errors'
 import { MAX_SCREENSHOTS, type ScreenshotEntry, type SourceError } from '@shared/types'
 import type { PreferencesService } from '../preferences/preferences-service'
+import { copyScreenshotsToClipboard, nothingDeleted, trashScreenshot } from './actions'
 import { backfillScreenshots, describe, isScreenshot } from './spotlight-source'
 import { createDirectoryWatcher } from './fs-watcher'
 import { resolveWatchedDirectories } from './location-resolver'
@@ -20,6 +21,8 @@ export interface ScreenshotService {
   open(id: string): Promise<void>
   reveal(id: string): Promise<void>
   markSeen(): Promise<void>
+  copy(ids: readonly string[]): Promise<void>
+  remove(ids: readonly string[]): Promise<void>
   sourceError(): Promise<SourceError | null>
   latest(): ScreenshotEntry | null
   unseenCount(): number
@@ -147,6 +150,50 @@ export function createScreenshotService(preferences: PreferencesService): Screen
     async markSeen() {
       await preferences.update({ screenshotsSeenWatermark: Date.now() })
       emit()
+    },
+
+    /**
+     * The renderer sends ids; this resolves them against `entries`, which main
+     * owns. A renderer-supplied path is never accepted (constitution,
+     * Security) - that is the whole reason copy takes ids at all.
+     *
+     * Partial resolution is not a failure: copying 3 of 4 succeeds. Resolving
+     * none of them is, because otherwise the user gets a silently cleared
+     * pasteboard (contracts/host-bridge.md).
+     */
+    async copy(ids) {
+      const paths: string[] = []
+      for (const id of ids) {
+        const entry = entries.find((e) => e.id === id)
+        if (!entry) continue
+        try {
+          await access(entry.path, constants.R_OK)
+          paths.push(entry.path)
+        } catch {
+          drop(id)
+        }
+      }
+      copyScreenshotsToClipboard(paths)
+    },
+
+    /**
+     * Trash, not unlink (research.md R-108). Deletion stays recoverable in
+     * Finder, which is also what makes a confirmation step unnecessary - and a
+     * modal over a panel that dismisses on focus loss would be a poor one.
+     */
+    async remove(ids) {
+      let deleted = 0
+
+      for (const id of ids) {
+        const entry = entries.find((e) => e.id === id)
+        if (!entry) continue
+        if (await trashScreenshot(entry.path)) {
+          drop(id)
+          deleted += 1
+        }
+      }
+
+      if (deleted === 0 && ids.length > 0) throw nothingDeleted()
     },
 
     async sourceError() {

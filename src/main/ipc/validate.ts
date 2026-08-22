@@ -64,6 +64,37 @@ export function requireNullableString(value: unknown, label: string): string | n
   return s
 }
 
+/**
+ * A batch of screenshot ids, for Copy and Delete.
+ *
+ * Ids are opaque keys into main's own store, resolved by the caller against
+ * state main owns. A renderer that sends `../../../etc/passwd` gets a lookup
+ * miss, not a file - which is the entire point of the identifier rule, and why
+ * these channels take ids rather than the shorter-to-write paths
+ * (contracts/ipc-channels.md).
+ */
+export function requireIdArray(value: unknown, max: number, label = 'ids'): string[] {
+  const obj = requireObject(value, 'payload')
+  const ids = obj[label]
+  if (!Array.isArray(ids)) fail(`${label} must be an array`)
+  if (ids.length === 0) fail(`${label} must not be empty`)
+  if (ids.length > max) fail(`${label} must contain at most ${max} entries`)
+  for (const id of ids) {
+    if (typeof id !== 'string' || id.length === 0) fail(`${label} must contain non-empty strings`)
+    if (id.includes('\0')) fail(`${label} contains an invalid character`)
+  }
+  return ids as string[]
+}
+
+/** Spotify's `sound volume` is an integer 0-100 (research.md R-109). */
+export function requireVolume(value: unknown, label = 'volume'): number {
+  const obj = requireObject(value, 'payload')
+  const n = obj[label]
+  if (typeof n !== 'number' || !Number.isInteger(n)) fail(`${label} must be an integer`)
+  if (n < 0 || n > 100) fail(`${label} must be between 0 and 100`)
+  return n
+}
+
 export function clamp(n: number, min: number, max: number): number {
   return Math.min(Math.max(n, min), max)
 }

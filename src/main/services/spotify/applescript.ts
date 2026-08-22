@@ -79,4 +79,24 @@ export const STATE_SCRIPT = `set playerState to player state as text
   set trackArtist to artist of current track
   set trackDuration to duration of current track
   set trackPosition to (round (player position * 1000))
-  return playerState & ${S} & trackName & ${S} & trackArtist & ${S} & (trackDuration as string) & ${S} & (trackPosition as string)`
+  set soundVolume to sound volume
+  set isShuffling to shuffling
+  set isRepeating to repeating
+  set artUrl to artwork url of current track
+  return playerState & ${S} & trackName & ${S} & trackArtist & ${S} & (trackDuration as string) & ${S} & (trackPosition as string) & ${S} & (soundVolume as string) & ${S} & (isShuffling as string) & ${S} & (isRepeating as string) & ${S} & artUrl`
+
+/**
+ * Volume, shuffle and repeat ride the SAME round trip as the rest of the state
+ * rather than three extra osascript spawns, which keeps the poll cost flat
+ * (research.md R-109, constitution Principle V).
+ *
+ * `sound volume` is an integer, so it does not hit the decimal-separator trap
+ * that `player position` did - but it still goes through the caller's numeric
+ * guard, because a locale surprise here would blank the whole playback state.
+ *
+ * `repeating` is a BOOLEAN. The off/all/one cycle in Spotify's own interface is
+ * not scriptable, which is why repeat ships as a toggle (FR-068 as amended).
+ */
+export const setVolumeScript = (volume: number): string => `set sound volume to ${volume}`
+export const setShuffleScript = (on: boolean): string => `set shuffling to ${on}`
+export const setRepeatScript = (on: boolean): string => `set repeating to ${on}`

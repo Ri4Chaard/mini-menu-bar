@@ -16,12 +16,13 @@ import type { HostBridge } from '../../src/renderer/host/host-contract'
 
 const CONTRACT_METHODS: (keyof HostBridge)[] = [
   'listScreenshots', 'openScreenshot', 'revealScreenshot', 'markScreenshotsSeen',
-  'onScreenshotsChanged', 'getScreenshotSourceError',
+  'onScreenshotsChanged', 'getScreenshotSourceError', 'copyScreenshots', 'deleteScreenshots',
   'getTimerState', 'startTimer', 'pauseTimer', 'resumeTimer', 'resetTimer', 'onTimerStateChanged',
   'getPlaybackState', 'togglePlayPause', 'nextTrack', 'previousTrack', 'seekTo', 'onPlaybackStateChanged',
+  'setVolume', 'setShuffle', 'setRepeat',
   'listNotes', 'createNote', 'updateNote', 'deleteNote', 'flushNotes',
   'getPreferences', 'updatePreferences', 'setTimerShortcut',
-  'closePanel', 'onPanelShown',
+  'closePanel', 'onPanelShown', 'quitApp',
   'getEnvironment', 'supportsNativeFeatures'
 ]
 
@@ -227,6 +228,125 @@ describe('HostBridge contract — mock implementation', () => {
     })
   })
 
+  describe('screenshot copy and delete (FR-058)', () => {
+    it('copies a single screenshot as an image and several as file references', async () => {
+      const [first, second] = await host.listScreenshots()
+
+      await host.copyScreenshots([first!.id])
+      expect(host.__mock.lastClipboardMode()).toBe('image')
+
+      await host.copyScreenshots([first!.id, second!.id])
+      expect(host.__mock.lastClipboardMode()).toBe('references')
+    })
+
+    it('skips ids that no longer resolve but succeeds if any do', async () => {
+      const [first] = await host.listScreenshots()
+      await expect(host.copyScreenshots([first!.id, 'gone'])).resolves.toBeUndefined()
+      expect(host.__mock.lastClipboardMode()).toBe('image')
+    })
+
+    it('throws rather than clearing the clipboard when nothing resolves', async () => {
+      await expect(host.copyScreenshots(['gone', 'also-gone'])).rejects.toThrow()
+    })
+
+    it('emits the survivors after a delete', async () => {
+      const before = await host.listScreenshots()
+      const cb = vi.fn()
+      host.onScreenshotsChanged(cb)
+
+      await host.deleteScreenshots([before[0]!.id])
+
+      expect(cb).toHaveBeenCalled()
+      const after = cb.mock.calls.at(-1)![0] as { id: string }[]
+      expect(after.map((e) => e.id)).not.toContain(before[0]!.id)
+      expect(after).toHaveLength(before.length - 1)
+    })
+
+    it('surfaces a delete that fails entirely', async () => {
+      const [first] = await host.listScreenshots()
+      host.__mock.setDeleteFails(true)
+      await expect(host.deleteScreenshots([first!.id])).rejects.toThrow()
+    })
+  })
+
+  describe('spotify volume, shuffle and repeat (FR-068 as amended)', () => {
+    it('accepts the ends of the volume range', async () => {
+      await expect(host.setVolume(0)).resolves.toBeUndefined()
+      await expect(host.setVolume(100)).resolves.toBeUndefined()
+      expect((await host.getPlaybackState()).volume).toBe(100)
+    })
+
+    it.each([-1, 101, 50.5, '50' as unknown as number])('rejects volume %s', async (bad) => {
+      await expect(host.setVolume(bad)).rejects.toThrow()
+    })
+
+    it('rejects a non-boolean shuffle or repeat', async () => {
+      await expect(host.setShuffle('yes' as unknown as boolean)).rejects.toThrow()
+      await expect(host.setRepeat(1 as unknown as boolean)).rejects.toThrow()
+    })
+
+    it('round-trips shuffle and repeat through the playback state', async () => {
+      await host.setShuffle(true)
+      await host.setRepeat(true)
+      const state = await host.getPlaybackState()
+      expect(state.shuffling).toBe(true)
+      // A toggle, not a cycle - the boolean is all Spotify exposes (R-109).
+      expect(state.repeating).toBe(true)
+    })
+
+    it('refuses all three when Spotify is unavailable', async () => {
+      host.__mock.setPlaybackAvailability('not-running')
+      await expect(host.setVolume(50)).rejects.toThrow()
+      await expect(host.setShuffle(true)).rejects.toThrow()
+      await expect(host.setRepeat(true)).rejects.toThrow()
+    })
+  })
+
+  describe('playback state nulling (data-model.md)', () => {
+    it.each(['not-running', 'permission-denied'] as const)(
+      'nulls every field when availability is %s',
+      async (availability) => {
+        host.__mock.setPlaybackAvailability(availability)
+        const state = await host.getPlaybackState()
+        // A stale volume or leftover artwork on an unavailable state is the
+        // ghost this rule exists to prevent.
+        expect(state).toMatchObject({
+          trackName: null,
+          artist: null,
+          positionMs: null,
+          durationMs: null,
+          volume: null,
+          shuffling: null,
+          repeating: null,
+          artworkDataUrl: null
+        })
+      }
+    )
+
+    it('carries artwork as a data URL, never an http(s) address', async () => {
+      const state = await host.getPlaybackState()
+      expect(state.artworkDataUrl).toMatch(/^data:/)
+      // The renderer must never receive something it could fetch (R-111).
+      expect(state.artworkDataUrl).not.toMatch(/^https?:/)
+    })
+
+    it('falls back to no artwork without disturbing the rest of the state', async () => {
+      host.__mock.setArtworkMissing(true)
+      const state = await host.getPlaybackState()
+      expect(state.artworkDataUrl).toBeNull()
+      expect(state.trackName).toBeTruthy()
+      expect(state.durationMs).toBeGreaterThan(0)
+    })
+  })
+
+  describe('quit (FR-076)', () => {
+    it('resolves and records the call rather than exiting', async () => {
+      expect(host.__mock.didQuit()).toBe(false)
+      await expect(host.quitApp()).resolves.toBeUndefined()
+      expect(host.__mock.didQuit()).toBe(true)
+    })
+  })
+
   it('every on* method returns a working unsubscribe', () => {
     const subs = [
       host.onScreenshotsChanged(() => {}),
@@ -303,5 +423,38 @@ describe('HostBridge contract — real implementation wiring', () => {
     expect(subscribe).toHaveBeenCalledWith(EVENT_CHANNELS.spotifyChanged, expect.any(Function))
     off()
     expect(invoke).toHaveBeenCalledWith(INVOKE_CHANNELS.spotifySubscribe, { active: false })
+  })
+})
+
+// ============================================================================
+// Part 3 — structural parity between the two implementations
+// ============================================================================
+
+/**
+ * CONTRACT_METHODS is hand-maintained, so on its own it proves only that the
+ * listed methods exist. These two cases close the loop: the mock and the real
+ * bridge must expose the SAME method set, and that set must be exactly the
+ * list. Adding a method to the interface and to one implementation - the
+ * "I'll add the mock in a follow-up" failure the constitution forbids - fails
+ * here rather than at runtime in browser mode.
+ */
+describe('HostBridge contract — structural parity', () => {
+  const methodsOf = (impl: object): string[] =>
+    Object.entries(impl)
+      .filter(([name, value]) => typeof value === 'function' && !name.startsWith('__'))
+      .map(([name]) => name)
+      .sort()
+
+  it('the mock and the real bridge expose identical method sets', async () => {
+    ;(globalThis as { window?: unknown }).window = {
+      __hostBridge: { invoke: async () => undefined, subscribe: () => () => {} }
+    }
+    const { createElectronBridge } = await import('../../src/renderer/host/host-bridge')
+
+    expect(methodsOf(createMockBridge())).toEqual(methodsOf(createElectronBridge()))
+  })
+
+  it('the declared contract list matches what the implementations actually expose', () => {
+    expect(methodsOf(createMockBridge())).toEqual([...CONTRACT_METHODS].sort())
   })
 })

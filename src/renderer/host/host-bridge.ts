@@ -46,6 +46,8 @@ export function createElectronBridge(): HostBridge {
     revealScreenshot: (id) => call<void>(INVOKE_CHANNELS.screenshotsReveal, { id }),
     markScreenshotsSeen: () => call<void>(INVOKE_CHANNELS.screenshotsMarkSeen),
     getScreenshotSourceError: () => call<SourceError | null>(INVOKE_CHANNELS.screenshotsSourceError),
+    copyScreenshots: (ids) => call<void>(INVOKE_CHANNELS.screenshotsCopy, { ids }),
+    deleteScreenshots: (ids) => call<void>(INVOKE_CHANNELS.screenshotsDelete, { ids }),
     onScreenshotsChanged: (cb) => on<ScreenshotEntry[]>(EVENT_CHANNELS.screenshotsChanged, cb),
 
     getTimerState: () => call<TimerState>(INVOKE_CHANNELS.timerGet),
@@ -60,6 +62,9 @@ export function createElectronBridge(): HostBridge {
     nextTrack: () => call<void>(INVOKE_CHANNELS.spotifyNext),
     previousTrack: () => call<void>(INVOKE_CHANNELS.spotifyPrevious),
     seekTo: (positionMs) => call<void>(INVOKE_CHANNELS.spotifySeek, { positionMs }),
+    setVolume: (volume) => call<void>(INVOKE_CHANNELS.spotifySetVolume, { volume }),
+    setShuffle: (shuffling) => call<void>(INVOKE_CHANNELS.spotifySetShuffle, { shuffling }),
+    setRepeat: (repeating) => call<void>(INVOKE_CHANNELS.spotifySetRepeat, { repeating }),
     onPlaybackStateChanged: (cb) => {
       // Polling starts on first subscribe and stops on last unsubscribe. Without
       // telling main, polling would either run forever — breaking the idle-CPU
@@ -84,6 +89,7 @@ export function createElectronBridge(): HostBridge {
       call<boolean>(INVOKE_CHANNELS.prefsSetShortcut, { accelerator }),
 
     closePanel: () => call<void>(INVOKE_CHANNELS.panelClose),
+    quitApp: () => call<void>(INVOKE_CHANNELS.appQuit),
     onPanelShown: (cb) => on<void>(EVENT_CHANNELS.panelShown, () => cb()),
 
     getEnvironment: () => 'electron',

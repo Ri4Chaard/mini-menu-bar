@@ -22,5 +22,6 @@
     "electron.vite.config.ts",
     "vite.browser.config.ts",
     "vitest.config.ts"
-  ]
+  ],
+  "exclude": ["tests/unit/renderer/**"]
 }

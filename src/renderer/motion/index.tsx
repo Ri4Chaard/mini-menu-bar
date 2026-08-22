@@ -40,8 +40,12 @@ export function useFadeIn(): {
   const reduced = useReducedMotion()
   return useMemo(
     () => ({
-      initial: reduced ? { opacity: 1 } : { opacity: 0, y: 4 },
-      animate: { opacity: 1, y: 0 },
+      // Opacity only, no translate. Panel UI v2 fixes the four bands in place,
+      // and a `y` offset would visibly shift the header, divider and footer
+      // during every section switch - exactly the "whole panel redrawing" read
+      // that FR-046 rules out (research.md R-115).
+      initial: reduced ? { opacity: 1 } : { opacity: 0 },
+      animate: { opacity: 1 },
       transition: { duration: reduced ? 0 : 0.18, ease: 'easeOut' }
     }),
     [reduced]

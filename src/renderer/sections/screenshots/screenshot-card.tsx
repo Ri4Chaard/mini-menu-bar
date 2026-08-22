@@ -1,78 +1,93 @@
+import { Check, Download } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { ExternalLink, FolderOpen } from 'lucide-react'
 import type { ScreenshotEntry } from '@shared/types'
 
-function relativeTime(epochMs: number): string {
-  const seconds = Math.max(0, Math.round((Date.now() - epochMs) / 1000))
-  if (seconds < 60) return 'just now'
-  const minutes = Math.round(seconds / 60)
+/** "2m ago", "14m ago", "1h ago", "Yesterday" — the design's time chip. */
+export function relativeTime(capturedAt: number, now: number): string {
+  const minutes = Math.floor((now - capturedAt) / 60_000)
+  if (minutes < 1) return 'Just now'
   if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.round(minutes / 60)
+  const hours = Math.floor(minutes / 60)
   if (hours < 24) return `${hours}h ago`
-  return `${Math.round(hours / 24)}d ago`
+  const days = Math.floor(hours / 24)
+  return days === 1 ? 'Yesterday' : `${days}d ago`
 }
 
-/** FR-011, FR-012: open in the default viewer, or reveal in Finder. */
+/**
+ * One thumbnail in the strip: 124x88 image, a corner selection badge, a
+ * relative-time chip, and a 124x13 meta row beneath (FR-055, FR-056).
+ */
 export function ScreenshotCard({
   entry,
+  selected,
+  now,
+  onToggle,
   onOpen,
   onReveal
 }: {
   entry: ScreenshotEntry
+  selected: boolean
+  now: number
+  onToggle: (id: string) => void
   onOpen: (id: string) => void
   onReveal: (id: string) => void
 }): ReactNode {
   return (
-    <li className="group relative overflow-hidden rounded-[var(--radius-card)] border border-[color:var(--color-border)] bg-[color:var(--color-surface-raised)]">
-      <button
-        type="button"
-        onClick={() => onOpen(entry.id)}
-        title={`Open ${entry.fileName}`}
-        className="block w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--color-accent)]"
+    <li className="flex shrink-0 flex-col gap-[7px]" style={{ width: 'var(--thumb-w)' }}>
+      <div
+        className="relative overflow-hidden rounded-[var(--radius-control)] bg-[var(--color-fill)]"
+        style={{ width: 'var(--thumb-w)', height: 'var(--thumb-h)' }}
       >
-        {entry.thumbnailDataUrl ? (
-          <img
-            src={entry.thumbnailDataUrl}
-            alt={entry.fileName}
-            /* Aspect-ratio-correct display: an unusual capture must not break layout. */
-            className="aspect-[16/10] w-full object-cover"
-          />
-        ) : (
-          <div className="flex aspect-[16/10] w-full items-center justify-center text-[color:var(--color-text-muted)]">
-            No preview
-          </div>
-        )}
-      </button>
-
-      {!entry.isSeen ? (
-        <span
-          aria-label="New"
-          className="absolute left-1.5 top-1.5 size-2 rounded-full bg-[color:var(--color-accent)]"
-        />
-      ) : null}
-
-      <div className="flex items-center gap-1 px-2 py-1.5">
-        <span className="min-w-0 flex-1 truncate" title={entry.fileName}>
-          {entry.fileName}
-        </span>
-        <span className="shrink-0 text-[color:var(--color-text-muted)]">
-          {relativeTime(entry.capturedAt)}
-        </span>
         <button
           type="button"
           onClick={() => onOpen(entry.id)}
           aria-label={`Open ${entry.fileName}`}
-          className="rounded p-1 hover:bg-[color:var(--color-surface-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--color-accent)]"
+          className="block size-full focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--color-accent)]"
         >
-          <ExternalLink className="size-3.5" aria-hidden />
+          {entry.thumbnailDataUrl ? (
+            <img
+              src={entry.thumbnailDataUrl}
+              alt=""
+              className="size-full object-cover"
+              draggable={false}
+            />
+          ) : null}
         </button>
+
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={selected}
+          aria-label={`Select ${entry.fileName}`}
+          onClick={() => onToggle(entry.id)}
+          className={`absolute top-1.5 left-1.5 flex size-5 items-center justify-center rounded-full transition-colors duration-[var(--duration-fast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)] ${
+            selected
+              ? 'bg-[var(--color-accent)] text-[var(--color-on-accent)]'
+              : 'bg-[var(--color-scrim)] text-transparent'
+          }`}
+        >
+          <Check className="size-3" aria-hidden />
+        </button>
+
+        <span className="absolute right-1.5 bottom-1.5 rounded-[var(--radius-chip)] bg-[var(--color-scrim)] px-1.5 py-0.5 text-[length:var(--text-micro)] text-[var(--color-on-accent)]">
+          {relativeTime(entry.capturedAt, now)}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between gap-1">
+        <span
+          className="truncate text-[length:var(--text-caption)] text-[var(--color-text-secondary)]"
+          title={entry.fileName}
+        >
+          {entry.fileName}
+        </span>
         <button
           type="button"
           onClick={() => onReveal(entry.id)}
           aria-label={`Reveal ${entry.fileName} in Finder`}
-          className="rounded p-1 hover:bg-[color:var(--color-surface-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--color-accent)]"
+          className="shrink-0 text-[var(--color-text-tertiary)] hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)]"
         >
-          <FolderOpen className="size-3.5" aria-hidden />
+          <Download className="size-3.5" aria-hidden />
         </button>
       </div>
     </li>

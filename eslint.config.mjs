@@ -42,6 +42,28 @@ const LUCIDE_NAMED_ONLY = [
   }
 ]
 
+/**
+ * SC-007: every colour, radius and spacing value resolves to a token declared
+ * once in theme.css. A hex literal inside a section or component is the exact
+ * drift this rule exists to catch, and catching it at lint time is what makes
+ * the criterion mechanical rather than a review convention.
+ *
+ * Scoped to sections/ and components/ — theme.css owns the literals, and
+ * host/, motion/ and main/ have no colour in them to begin with.
+ */
+const NO_COLOUR_LITERALS = [
+  {
+    selector: "Literal[value=/#[0-9a-fA-F]{3,8}\\b/]",
+    message:
+      'No colour literals here (SC-007). Reference a token from theme.css, e.g. var(--color-accent). New colours are added to contracts/design-tokens.md and theme.css together.'
+  },
+  {
+    selector: 'TemplateElement[value.raw=/#[0-9a-fA-F]{3,8}\\b/]',
+    message:
+      'No colour literals here (SC-007). Reference a token from theme.css, e.g. var(--color-accent).'
+  }
+]
+
 export default tseslint.config(
   { ignores: ['out/', 'dist/', 'release/', 'node_modules/', 'coverage/', 'test-results/'] },
   js.configs.recommended,
@@ -62,6 +84,17 @@ export default tseslint.config(
     files: ['src/renderer/host/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-syntax': ['error', ...LUCIDE_NAMED_ONLY]
+    }
+  },
+  {
+    files: ['src/renderer/sections/**/*.{ts,tsx}', 'src/renderer/components/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...HOST_GLOBALS_BANNED,
+        ...LUCIDE_NAMED_ONLY,
+        ...NO_COLOUR_LITERALS
+      ]
     }
   },
   {

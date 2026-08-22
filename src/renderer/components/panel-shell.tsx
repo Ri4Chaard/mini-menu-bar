@@ -55,7 +55,10 @@ export function PanelShell({ children }: { children: ReactNode }): ReactNode {
   return (
     <div
       ref={root}
-      className="flex h-full overflow-hidden rounded-[var(--radius-panel)] bg-[color:var(--color-surface)]"
+      // overflow-hidden is load-bearing, not cosmetic: it is what guarantees
+      // FR-047: the panel itself never scrolls. A section with more content
+      // than fits scrolls inside its own body band instead (R-105).
+      className="flex h-full overflow-hidden rounded-[var(--radius-panel)] bg-[var(--color-surface)]"
     >
       {children}
     </div>

@@ -1,39 +1,146 @@
 @import "tailwindcss";
 
-/* Appearance tokens are declared exactly once here and switched by
-   prefers-color-scheme. No JavaScript, no re-render — the panel follows a
-   system appearance change while it is open (spec edge case, quickstart V-014).
-   Per-component colour literals are forbidden by the constitution; every
-   component references these tokens. */
-@theme {
-  --color-surface: #f5f5f7;
-  --color-surface-raised: #ffffff;
-  --color-surface-hover: #ebebef;
-  --color-border: #d8d8de;
+/* ---------------------------------------------------------------------------
+   Panel UI v2 tokens.
+
+   Declared exactly once here and switched by prefers-color-scheme. No
+   JavaScript, no re-render, no media-query listener — the panel follows a system
+   appearance change while it is open because the media query does, which is all
+   FR-083 asks for.
+
+   Dark values are MEASURED from design/mini-menu-bar-design.pen. Light values
+   are derived by inverting token ROLES, not hex values: the rail's defining
+   property is that it sits recessed against the content surface, and a
+   mechanical inversion would make it lighter and break that relationship
+   (research.md R-104).
+
+   Per-component colour literals are forbidden by the constitution and by the
+   lint rule in eslint.config.mjs. Every component references these tokens.
+   The authoritative table is specs/002-panel-ui-v2/contracts/design-tokens.md;
+   this file and that file change together.
+--------------------------------------------------------------------------- */
+
+/*
+ * Plain :root, NOT @theme.
+ *
+ * Tailwind v4 hoists @theme to the top level, so an @theme nested inside a
+ * media query is emitted unconditionally and the later block simply wins -
+ * which rendered the light appearance dark. Every token here is consumed as an
+ * arbitrary value (bg-[var(--color-surface)], text-[length:var(--text-body)]),
+ * so no generated utility depends on @theme and plain custom properties are
+ * both sufficient and correctly scoped.
+ */
+:root {
+  color-scheme: light dark;
+
+  /* -- Colour: light appearance (derived, R-104) -------------------------- */
+  --color-surface: #ffffff;
+  --color-rail: #f0f0f3;
+  --color-rail-border: #0000000f;
+  --color-hairline: #00000014;
+  --color-fill-subtle: #00000008;
+  --color-fill: #0000000d;
+  --color-fill-strong: #00000014;
   --color-text: #1c1c1e;
-  --color-text-muted: #6b6b73;
-  --color-accent: #2f6feb;
-  --color-accent-text: #ffffff;
-  --color-danger: #c8372d;
+  --color-text-secondary: #6e6e73;
+  --color-text-tertiary: #8e8e93;
+  --color-text-strong: #2c2c2e;
+  --color-accent: #2b89fa;
+  --color-accent-strong: #1b6fd6;
+  --color-accent-text: #0a63c9;
+  --color-accent-subtle: #2b89fa1f;
+  --color-accent-faint: #2b89fa14;
+  --color-accent-border: #2b89fa8c;
+  --color-on-accent: #ffffff;
+  --color-danger: #d70015;
+  --color-danger-subtle: #d700151a;
+  --color-scrim: #000000a6;
 
-  --radius-panel: 12px;
-  --radius-card: 8px;
+  /* -- Geometry ----------------------------------------------------------- */
+  --panel-width: 632px;
+  --panel-height: 235px;
+  --radius-panel: 20px;
+  --radius-control: 12px;
+  --radius-chip: 9px;
 
+  --rail-width: 64px;
+  --rail-padding: 12px;
+  --rail-gap: 6px;
+  --rail-item: 36px;
+  --rail-icon: 18px;
+
+  --content-padding-y: 16px;
+  --content-padding-x: 18px;
+  --content-gap: 14px;
+
+  --band-header: 24px;
+  --band-body: 108px;
+  --band-footer: 28px;
+
+  --header-gap-left: 8px;
+  --header-gap-right: 14px;
+  --footer-gap: 10px;
+
+  --chip-padding-y: 6px;
+  --chip-padding-x: 12px;
+
+  --switch-w: 34px;
+  --switch-h: 20px;
+  --switch-knob: 16px;
+
+  --thumb-w: 124px;
+  --thumb-h: 88px;
+  --thumb-gap: 12px;
+
+  --track-height: 4px;
+  --track-knob: 10px;
+
+  /* -- Type ---------------------------------------------------------------
+     The design file specifies Inter; that is a pen.dev canvas stand-in for
+     "a neutral UI sans" — the canvas has no access to SF Pro. On the actual
+     target SF Pro IS the native face, costs 0 KB against the payload budget,
+     and is what every adjacent menu bar surface renders in (R-103).
+  ------------------------------------------------------------------------ */
+  --text-display: 48px;
+  --text-title: 15px;
+  --text-track: 17px;
+  --text-body: 12px;
+  --text-control: 11.5px;
+  --text-meta: 11px;
+  --text-caption: 10.5px;
+  --text-micro: 10px;
+
+  /* -- Motion -------------------------------------------------------------- */
   --duration-fast: 120ms;
   --duration-base: 180ms;
 }
 
 @media (prefers-color-scheme: dark) {
-  @theme {
-    --color-surface: #1c1c1e;
-    --color-surface-raised: #2c2c2e;
-    --color-surface-hover: #3a3a3c;
-    --color-border: #3a3a3c;
-    --color-text: #f2f2f7;
-    --color-text-muted: #98989f;
-    --color-accent: #4f8bff;
-    --color-accent-text: #0b0b0c;
-    --color-danger: #ff6b5f;
+  :root {
+    /* Measured from the design frames. Only colour differs between
+       appearances — geometry and type are identical, which is what makes the
+       two read as one design rather than two (FR-082). */
+    --color-surface: #1a1a1c;
+    --color-rail: #141416;
+    --color-rail-border: #ffffff0f;
+    --color-hairline: #ffffff14;
+    --color-fill-subtle: #ffffff0a;
+    --color-fill: #ffffff0f;
+    --color-fill-strong: #ffffff14;
+    --color-text: #f2f2f5;
+    --color-text-secondary: #8e8e93;
+    --color-text-tertiary: #6e6e73;
+    --color-text-strong: #e5e5ea;
+    --color-accent: #2b89fa;
+    --color-accent-strong: #1b6fd6;
+    --color-accent-text: #5aa7ff;
+    --color-accent-subtle: #2b89fa26;
+    --color-accent-faint: #2b89fa1f;
+    --color-accent-border: #2b89fa8c;
+    --color-on-accent: #ffffff;
+    --color-danger: #ff5f55;
+    --color-danger-subtle: #ff453a1f;
+    --color-scrim: #000000a6;
   }
 }
 
@@ -48,8 +155,65 @@ body {
   background-color: var(--color-surface);
   color: var(--color-text);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
-  font-size: 13px;
+  font-size: var(--text-body);
   overflow: hidden;
+}
+
+/* Browser mode renders the panel at its true size against a neutral backdrop
+   rather than filling the viewport, so what dev:browser shows is what the menu
+   bar shows (Principle I). In Electron the window IS the panel. */
+@media (min-height: 400px) {
+  body {
+    display: grid;
+    place-items: center;
+    background-color: color-mix(in srgb, var(--color-text) 8%, transparent);
+  }
+
+  #root {
+    width: var(--panel-width);
+    height: var(--panel-height);
+  }
+}
+
+/* The seek and volume controls are native range inputs, styled here rather
+   than rebuilt from pointer events: a non-activating panel can swallow the
+   first pointerdown of a hand-rolled drag, and the native control brings
+   keyboard operation and an accessible role with it (R-117, FR-048). */
+input[type="range"].track {
+  appearance: none;
+  -webkit-appearance: none;
+  /* No width here: `input[type=range].track` (0,1,1) outranks a `w-18`
+     utility (0,1,0), so declaring one would silently override every caller's
+     width. Callers size the control themselves. */
+  height: var(--track-knob);
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"].track::-webkit-slider-runnable-track {
+  height: var(--track-height);
+  border-radius: var(--track-height);
+  background: linear-gradient(
+    to right,
+    var(--color-accent) 0 var(--track-progress, 0%),
+    var(--color-fill-strong) var(--track-progress, 0%) 100%
+  );
+}
+
+input[type="range"].track::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: var(--track-knob);
+  height: var(--track-knob);
+  margin-top: calc((var(--track-height) - var(--track-knob)) / 2);
+  border-radius: 50%;
+  background: var(--color-on-accent);
+  box-shadow: 0 0 0 1px var(--color-scrim);
+}
+
+input[type="range"].track:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 /* Constitution Principle III: honour the system reduce-motion setting.

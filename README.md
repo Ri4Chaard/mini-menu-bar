@@ -6,14 +6,39 @@ straight into the menu bar.
 
 Built with Electron, TypeScript, React, Tailwind CSS v4, Motion, and Lucide.
 
+The panel is a 632 x 235 pt card: a 64 pt icon rail down the left, and a content column of four
+fixed bands — header, body, hairline divider, footer — that every section fills. The whole of a
+section is visible at a glance; the panel itself never scrolls.
+
 ## The idea
 
 Screenshots get lost. They scatter across the Desktop or land in a folder you forget about. This app
 finds them **wherever they ended up** — it queries Spotlight's `kMDItemIsScreenCapture` attribute,
 which macOS stamps on every screenshot and which survives renaming and moving.
 
-It is strictly read-only over your filesystem. It never moves, renames, or deletes a file, and never
-changes your system screenshot location. Uninstalling it leaves everything exactly as it was.
+The app never touches your files on its own initiative. It indexes screenshots strictly read-only —
+watching, reading metadata, building thumbnails — and never changes your system screenshot location.
+The only exceptions are the two things you explicitly click: **Copy** puts screenshots on the
+clipboard, and **Delete** moves them to the Trash, where they stay recoverable in Finder. Nothing is
+ever hard-deleted, renamed, or overwritten. Uninstalling leaves everything exactly as it was.
+
+### One network request, and only one
+
+The app has no account, no telemetry, and no analytics. It makes exactly one outbound request:
+**album artwork** for the track Spotify is currently playing. There is no local source for it —
+Spotify's scripting interface hands back a URL, not image bytes.
+
+That request is bounded, and the bounds are why it is acceptable in an otherwise offline app:
+
+- Image bytes only, from Spotify's artwork host, over https.
+- Made by the main process, never the interface. The panel receives the image, never the address,
+  so the UI works fully with no network at all.
+- No cookies, no credentials, no header identifying you.
+- Only while the Spotify section is open or its menu bar preview is on; once per artwork per
+  session, cached in memory.
+- On failure it is silent: a placeholder shows and everything else still works.
+
+See `specs/002-panel-ui-v2/spec.md` FR-087.
 
 ## Getting started
 
@@ -58,6 +83,15 @@ Two rules are enforced by lint rather than by review:
 
 - The preload-exposed global may only be referenced inside `src/renderer/host/`.
 - `lucide-react` must be imported by name; namespace imports defeat tree-shaking and blow the budget.
+- No colour literal may appear in a section or component. Every colour, radius, and spacing value
+  resolves to a token declared once in `src/renderer/styles/theme.css`, which
+  `tests/unit/design-tokens.spec.ts` checks for contrast in both appearances.
+
+### Appearance
+
+Light and dark are the same design with the palette roles inverted — identical layout, spacing and
+type. The switch is pure CSS (`prefers-color-scheme`); there is no JavaScript listener and no
+re-render, so the panel follows a system appearance change while it is open.
 
 ### Two decisions worth knowing
 

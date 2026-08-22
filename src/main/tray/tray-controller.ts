@@ -42,7 +42,11 @@ export function createTrayController(deps: TrayDeps): TrayController {
     trackName: null,
     artist: null,
     positionMs: null,
-    durationMs: null
+    durationMs: null,
+    volume: null,
+    shuffling: null,
+    repeating: null,
+    artworkDataUrl: null
   }
 
   let thumbnailFor: string | null = null
