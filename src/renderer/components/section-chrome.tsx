@@ -1,7 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { MoreHorizontal } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { IconButton } from './ui/icon-button'
 import { Pill } from './ui/pill'
 
 /**
@@ -22,17 +20,13 @@ export function SectionChrome({
   title,
   pill,
   action,
-  onOverflow,
-  overflowLabel,
   children,
   footer
 }: {
   title: string
   pill?: ReactNode
-  /** The header's text action - "Select All", "Edit Presets", "Open Spotify". */
+  /** The header's text action - "Select All". */
   action?: ReactNode
-  onOverflow?: () => void
-  overflowLabel?: string
   children: ReactNode
   footer?: ReactNode
 }): ReactNode {
@@ -54,14 +48,11 @@ export function SectionChrome({
           </h2>
           {pill ? <Pill>{pill}</Pill> : null}
         </div>
+        {/* The three-dot overflow control that used to sit beside the action
+            was wired to nothing in every section, so feature 003 removed it
+            rather than leaving a permanently disabled button (FR-117). */}
         <div style={{ gap: 'var(--header-gap-right)' }} className="flex shrink-0 items-center">
           {action}
-          <IconButton
-            icon={MoreHorizontal}
-            label={overflowLabel ?? `More ${title.toLowerCase()} options`}
-            onClick={onOverflow}
-            disabled={!onOverflow}
-          />
         </div>
       </header>
 

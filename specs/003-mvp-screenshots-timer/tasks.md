@@ -150,10 +150,10 @@ confirm the app icon appears with no badge.
 **Independent Test**: No three-dot control in any section header; the app and menu bar carry the
 wine-glass mark in both appearances.
 
-- [ ] T043 [P] [US5] Remove the `MoreHorizontal` control and the now-unused `onOverflow` / `overflowLabel` props from `src/renderer/components/section-chrome.tsx` — it is wired to nothing in any section, so this cannot regress behaviour (FR-117)
-- [ ] T044 [P] [US5] Create `scripts/make-icons.mjs` emitting PNGs with a hand-rolled encoder over Node's built-in `zlib`, since no SVG rasteriser is installed on the target machine (R-205)
-- [ ] T045 [US5] Generate `resources/trayTemplate.png` and `resources/trayTemplate@2x.png` as a **monochrome-plus-alpha template** wine-glass silhouette, replacing the four-square grid glyph that was being read as a broken image (R-204)
-- [ ] T046 [US5] Generate `build/icon.icns` via `iconutil` from a generated `.iconset` and reference it from `electron-builder.yml` (FR-118)
+- [X] T043 [P] [US5] Remove the `MoreHorizontal` control and the now-unused `onOverflow` / `overflowLabel` props from `src/renderer/components/section-chrome.tsx` — it is wired to nothing in any section, so this cannot regress behaviour (FR-117)
+- [X] T044 [P] [US5] Create `scripts/make-icons.mjs` emitting PNGs with a hand-rolled encoder over Node's built-in `zlib`, since no SVG rasteriser is installed on the target machine (R-205)
+- [X] T045 [US5] Generate `resources/trayTemplate.png` and `resources/trayTemplate@2x.png` as a **monochrome-plus-alpha template** wine-glass silhouette, replacing the four-square grid glyph that was being read as a broken image (R-204)
+- [X] T046 [US5] Generate `build/icon.icns` via `iconutil` from a generated `.iconset` and reference it from `electron-builder.yml` (FR-118)
 - [ ] T047 [US5] Verify via `specs/003-mvp-screenshots-timer/quickstart.md` Gate 5 that `resources/trayTemplate.png` tints correctly in both light and dark menu bars, which is what the template-image constraint exists to guarantee (FR-116)
 
 **Checkpoint**: All five stories complete.
