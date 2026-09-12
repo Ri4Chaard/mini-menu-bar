@@ -8,7 +8,13 @@ import {
   formatDurationInput,
   parseDuration
 } from '../../../src/renderer/sections/timer/parse-duration'
-import { presetLabel } from '../../../src/renderer/sections/timer/timer-section'
+import {
+  isSettable,
+  presetLabel,
+  readoutMs,
+  statusLine
+} from '../../../src/renderer/sections/timer/timer-section'
+import type { TimerState } from '../../../src/shared/types'
 import { MAX_TIMER_PRESET_MS, MIN_TIMER_PRESET_MS } from '../../../src/shared/types'
 
 const MINUTE = 60_000
@@ -138,5 +144,79 @@ describe('presetLabel', () => {
     const ms = parseDuration('0:10')!
     expect(ms).toBe(10_000)
     expect(presetLabel(ms)).toBe('10s')
+  })
+})
+
+/**
+ * The reported bug, as a property rather than a story: after a timer ended,
+ * typing a new duration left the readout showing 0:00.
+ *
+ * The cause was that the readout only honoured a typed duration while the
+ * status was 'idle'. A finished timer is 'finished', so the typed value was
+ * discarded in favour of the ended countdown's remaining 0 ms — and with the
+ * alarm toggle off there is no Dismiss button to move it out of that state at
+ * all, so the timer was effectively stuck.
+ */
+describe('the timer readout', () => {
+  const state = (over: Partial<TimerState> = {}): TimerState => ({
+    status: 'idle',
+    configuredDurationMs: 300_000,
+    deadlineAt: null,
+    remainingMs: 300_000,
+    alarming: false,
+    ...over
+  })
+
+  const finished = state({ status: 'finished', remainingMs: 0 })
+
+  it('shows a duration typed after the timer finished', () => {
+    expect(readoutMs(finished, 3_000)).toBe(3_000)
+  })
+
+  it('shows 0:00 for a finished timer with nothing typed', () => {
+    expect(readoutMs(finished, null)).toBe(0)
+  })
+
+  it('shows a duration typed while idle', () => {
+    expect(readoutMs(state(), 3_000)).toBe(3_000)
+  })
+
+  it('never lets a typed duration replace a live countdown', () => {
+    // FR-108: typing must not silently alter a timer that is already running.
+    const running = state({ status: 'running', remainingMs: 42_000 })
+    expect(readoutMs(running, 3_000)).toBe(42_000)
+
+    const paused = state({ status: 'paused', remainingMs: 42_000 })
+    expect(readoutMs(paused, 3_000)).toBe(42_000)
+  })
+
+  it('treats idle and finished alike, and running and paused alike', () => {
+    expect(isSettable('idle')).toBe(true)
+    expect(isSettable('finished')).toBe(true)
+    expect(isSettable('running')).toBe(false)
+    expect(isSettable('paused')).toBe(false)
+  })
+})
+
+describe('the timer status line', () => {
+  const base: TimerState = {
+    status: 'finished',
+    configuredDurationMs: 300_000,
+    deadlineAt: null,
+    remainingMs: 0,
+    alarming: false
+  }
+
+  it('describes what will run next rather than the run that ended', () => {
+    // "Finished" under a readout showing 0:03 would contradict it.
+    expect(statusLine(base, 3_000)).toBe('Ready · 3s')
+  })
+
+  it('still says Finished when nothing has been typed', () => {
+    expect(statusLine(base, null)).toBe('Finished')
+  })
+
+  it('lets a ringing alarm outrank a typed duration', () => {
+    expect(statusLine({ ...base, alarming: true }, 3_000)).toBe('Alarm ringing')
   })
 })

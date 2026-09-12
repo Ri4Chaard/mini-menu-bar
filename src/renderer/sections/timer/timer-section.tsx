@@ -32,11 +32,33 @@ export function presetLabel(ms: number): string {
   return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`
 }
 
+/**
+ * Whether the readout is showing a duration the user is CHOOSING rather than a
+ * countdown in progress.
+ *
+ * 'finished' belongs here alongside 'idle', and leaving it out was a bug: after
+ * a timer ended, typing a new duration had no visible effect because the
+ * readout kept falling back to the finished countdown's remaining 0 ms. It is
+ * reachable with the alarm toggle off too, where there is no Dismiss button to
+ * clear the finished state at all.
+ */
+export function isSettable(status: TimerState['status']): boolean {
+  return status === 'idle' || status === 'finished'
+}
+
+/** What the big readout shows: a typed duration if there is one, else the clock. */
+export function readoutMs(state: TimerState, pendingMs: number | null): number {
+  return pendingMs !== null && isSettable(state.status) ? pendingMs : state.remainingMs
+}
+
 /** "Ready · ends at 18:32" — the status line under the readout. */
-function statusLine(state: TimerState): string {
+export function statusLine(state: TimerState, pendingMs: number | null = null): string {
   // The alarm outranks everything: it is the thing demanding attention, and it
   // can be ringing over a countdown repeat has already restarted.
   if (state.alarming) return 'Alarm ringing'
+  // A typed duration outranks 'Finished': the readout is showing what will run
+  // next, so the line beneath it must not still describe the run that ended.
+  if (pendingMs !== null && isSettable(state.status)) return `Ready · ${presetLabel(pendingMs)}`
   if (state.status === 'finished') return 'Finished'
   if (state.status === 'idle') return `Ready · ${presetLabel(state.configuredDurationMs)}`
 
@@ -78,7 +100,6 @@ export function TimerSection({
   if (!state) return null
 
   const running = state.status === 'running'
-  const idle = state.status === 'idle'
 
   /** The duration the Save control would store: what is typed, else configured. */
   const currentMs = pendingMs ?? state.configuredDurationMs
@@ -112,7 +133,15 @@ export function TimerSection({
         : {
             label: 'Start',
             icon: Play,
-            run: () => host.startTimer(pendingMs ?? state.configuredDurationMs)
+            run: async () => {
+              const next = await host.startTimer(pendingMs ?? state.configuredDurationMs)
+              // startTimer adopts the duration as `configuredDurationMs`, so the
+              // pending value has done its job. Holding on to it would make the
+              // readout show the typed duration again the moment this countdown
+              // finished, instead of 0:00.
+              setPendingMs(null)
+              return next
+            }
           }
   const PrimaryIcon = primary.icon
 
@@ -170,7 +199,7 @@ export function TimerSection({
             content, so the preset row is what must give way if anything does. */}
         <div className="flex shrink-0 flex-col gap-1.5">
           <DurationInput
-            displayMs={idle && pendingMs !== null ? pendingMs : state.remainingMs}
+            displayMs={readoutMs(state, pendingMs)}
             configuredMs={pendingMs ?? state.configuredDurationMs}
             status={state.status}
             // Committing a typed duration sets what Start will use. It does
@@ -194,7 +223,7 @@ export function TimerSection({
               }`}
             />
             <span className="text-[length:var(--text-meta)] text-[var(--color-text-secondary)]">
-              {statusLine(state)}
+              {statusLine(state, pendingMs)}
             </span>
           </span>
         </div>
