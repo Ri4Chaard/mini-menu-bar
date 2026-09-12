@@ -28,8 +28,8 @@ export function App(): ReactNode {
     }
   }, [host])
 
-  // The unseen badge is needed by the rail regardless of which section is
-  // open, so the collection is owned here rather than inside the section.
+  // The rail's count badge is needed regardless of which section is open, so
+  // the collection is owned here rather than inside the section.
   useEffect(() => {
     void host.listScreenshots().then(setScreenshots).catch(() => setScreenshots([]))
     return host.onScreenshotsChanged(setScreenshots)

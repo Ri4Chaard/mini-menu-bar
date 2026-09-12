@@ -130,13 +130,13 @@ file opening; double-click one and confirm it opens.
 **Independent Test**: Take a screenshot and watch the count rise within 2 s; delete them all and
 confirm the app icon appears with no badge.
 
-- [ ] T035 [P] [US4] Create `src/main/tray/badge.ts` with `digitGlyph` (the 3×5 bitmap font from R-202) and `composeBadge`, implementing every row of the behavioural contract in `contracts/tray-badge.md`
-- [ ] T036 [P] [US4] Write `tests/unit/tray-badge.spec.ts` covering all six test obligations — in particular that `count <= 0` leaves the buffer **byte-identical**, and that pixels outside the badge region are untouched (the test that catches a row-stride off-by-one)
-- [ ] T037 [US4] Replace `unseenCount()` and all seen-watermark tracking with a total count in `src/main/services/screenshots/screenshot-store.ts` (FR-110, FR-112)
-- [ ] T038 [US4] Change `composePreview` in `src/main/tray/preview-composer.ts` to emit `badgeCount` instead of an unseen title segment, per the `TrayPreviewModel` change in `data-model.md` (depends on T020)
-- [ ] T039 [US4] Composite the badge in `src/main/tray/tray-controller.ts` at 64×36 tagged `scaleFactor: 2`, and **never composite onto `defaultImage`** — a zero count must not paint "0" over the app icon (FR-114, FR-115)
-- [ ] T040 [US4] Update `tests/unit/preview-composer.spec.ts` for the new model and count semantics
-- [ ] T041 [US4] Remove any remaining mark-seen references from `tests/unit/screenshots-readonly.spec.ts` and `tests/unit/staging-source.spec.ts`
+- [X] T035 [P] [US4] Create `src/main/tray/badge.ts` with `digitGlyph` (the 3×5 bitmap font from R-202) and `composeBadge`, implementing every row of the behavioural contract in `contracts/tray-badge.md`
+- [X] T036 [P] [US4] Write `tests/unit/tray-badge.spec.ts` covering all six test obligations — in particular that `count <= 0` leaves the buffer **byte-identical**, and that pixels outside the badge region are untouched (the test that catches a row-stride off-by-one)
+- [X] T037 [US4] Replace `unseenCount()` and all seen-watermark tracking with a total count in `src/main/services/screenshots/screenshot-store.ts` (FR-110, FR-112)
+- [X] T038 [US4] Change `composePreview` in `src/main/tray/preview-composer.ts` to emit `badgeCount` instead of an unseen title segment, per the `TrayPreviewModel` change in `data-model.md` (depends on T020)
+- [X] T039 [US4] Composite the badge in `src/main/tray/tray-controller.ts` at 64×36 tagged `scaleFactor: 2`, and **never composite onto `defaultImage`** — a zero count must not paint "0" over the app icon (FR-114, FR-115)
+- [X] T040 [US4] Update `tests/unit/preview-composer.spec.ts` for the new model and count semantics
+- [X] T041 [US4] Remove any remaining mark-seen references from `tests/unit/screenshots-readonly.spec.ts` and `tests/unit/staging-source.spec.ts`
 - [ ] T042 [US4] Verify via `specs/003-mvp-screenshots-timer/quickstart.md` Gate 5 that the menu bar reflects a new capture within the existing 2 s budget (FR-113)
 
 **Checkpoint**: The menu bar reports an honest total and never shows a placeholder.
