@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Bell, BellOff, Pause, Play, Plus, Repeat, RotateCcw } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Bell, BellOff, Pause, Play, Repeat, RotateCcw } from 'lucide-react'
 import { MAX_TIMER_PRESETS, type Preferences, type TimerState } from '@shared/types'
+import { DurationInput } from './duration-input'
 import { useHost } from '../../host/use-host'
 import { FooterNote, HeaderAction, SectionChrome } from '../../components/section-chrome'
 import { PreviewToggle } from '../../components/preview-toggle'
 import { Chip } from '../../components/ui/chip'
 import { IconButton } from '../../components/ui/icon-button'
-import { formatClock } from './format-clock'
+
 
 const MINUTE = 60_000
 
@@ -51,15 +52,21 @@ export function TimerSection({
   }, [host])
 
   const presets = preferences.timerPresets
-  const nextPreset = useMemo(() => {
-    // Offer the next round duration that is not already on the row.
-    const candidates = [1, 2, 3, 5, 10, 15, 20, 25, 30, 45, 60, 90].map((m) => m * MINUTE)
-    return candidates.find((ms) => !presets.includes(ms)) ?? null
-  }, [presets])
+
+  /**
+   * A duration typed but not yet started.
+   *
+   * Held here rather than pushed through the timer service because FR-108
+   * forbids a typed duration silently replacing a countdown that is already
+   * running. Typing sets what Start will use; it never touches a live
+   * countdown. Persisted alongside, so it survives a restart.
+   */
+  const [pendingMs, setPendingMs] = useState<number | null>(null)
 
   if (!state) return null
 
   const running = state.status === 'running'
+  const idle = state.status === 'idle'
   // Dismiss REPLACES the transport action rather than joining the row. The
   // body band is a fixed 108 pt and the button row already fills its width, so
   // a third button would push the presets out of the panel - and while an
@@ -70,7 +77,11 @@ export function TimerSection({
       ? { label: 'Pause', icon: Pause, run: () => host.pauseTimer() }
       : state.status === 'paused'
         ? { label: 'Resume', icon: Play, run: () => host.resumeTimer() }
-        : { label: 'Start', icon: Play, run: () => host.startTimer(state.configuredDurationMs) }
+        : {
+            label: 'Start',
+            icon: Play,
+            run: () => host.startTimer(pendingMs ?? state.configuredDurationMs)
+          }
   const PrimaryIcon = primary.icon
 
   const footer = (
@@ -114,13 +125,22 @@ export function TimerSection({
     >
       <div className="flex h-full items-center justify-between gap-4">
         <div className="flex flex-col gap-1.5">
-          <p
-            aria-live="polite"
-            data-status={state.status}
-            className="text-[length:var(--text-display)] leading-[1.05] font-semibold tabular-nums text-[var(--color-text)]"
-          >
-            {formatClock(state.remainingMs)}
-          </p>
+          <DurationInput
+            displayMs={idle && pendingMs !== null ? pendingMs : state.remainingMs}
+            configuredMs={pendingMs ?? state.configuredDurationMs}
+            status={state.status}
+            onCommit={(ms) => {
+              setPendingMs(ms)
+              onUpdatePreferences({
+                timerDurationMs: ms,
+                // A typed duration joins the quick-pick row. normalisePresets
+                // sorts, de-duplicates and caps it, so a repeat of an existing
+                // value is a no-op rather than a duplicate chip.
+                timerPresets:
+                  presets.length < MAX_TIMER_PRESETS ? [...presets, ms] : presets
+              })
+            }}
+          />
           <span className="flex items-center gap-1.5">
             <span
               aria-hidden
@@ -172,6 +192,7 @@ export function TimerSection({
                     }
                     return
                   }
+                  setPendingMs(null)
                   void host.startTimer(ms).then(setState)
                 }}
                 // No aria-label in the normal case: the chip's own text IS its
@@ -182,17 +203,10 @@ export function TimerSection({
                 {editing ? `${presetLabel(ms)} ✕` : presetLabel(ms)}
               </Chip>
             ))}
-            {nextPreset !== null && presets.length < MAX_TIMER_PRESETS ? (
-              <IconButton
-                icon={Plus}
-                label={`Add a ${presetLabel(nextPreset)} preset`}
-                size={28}
-                iconSize={13}
-                onClick={() =>
-                  onUpdatePreferences({ timerPresets: [...presets, nextPreset] })
-                }
-              />
-            ) : null}
+            {/* The control that used to sit here invented a duration on the
+                user's behalf from a fixed candidate list, which is exactly what
+                FR-105 removes. Durations are typed into the readout now, and a
+                committed one joins this row as a quick pick. */}
           </div>
         </div>
       </div>

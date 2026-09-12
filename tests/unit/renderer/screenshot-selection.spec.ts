@@ -10,7 +10,8 @@ import { describe, expect, it } from 'vitest'
 import type { ScreenshotEntry } from '../../../src/shared/types'
 import {
   dragIdsFor,
-  reconcileSelection
+  reconcileSelection,
+  toggleSelection
 } from '../../../src/renderer/sections/screenshots/selection'
 import { timeChipLabel } from '../../../src/renderer/sections/screenshots/screenshot-card'
 
@@ -91,5 +92,45 @@ describe('timeChipLabel', () => {
     expect(timeChipLabel({ ...entry('a'), capturedAt: at(2), isTemporary: true }, now)).toBe(
       'Unsaved · 2m ago'
     )
+  })
+})
+
+/**
+ * The gesture contract feature 003 introduced (FR-097, FR-098, FR-101).
+ *
+ * The double-click property is the one that matters: it is what makes a
+ * click-delay unnecessary, and a future "optimisation" that deferred the single
+ * click would be justified only if this property did NOT hold. It does.
+ */
+describe('toggleSelection', () => {
+  it('adds an unselected id', () => {
+    expect(toggleSelection(new Set(), 'a')).toEqual(new Set(['a']))
+  })
+
+  it('removes a selected id', () => {
+    expect(toggleSelection(new Set(['a', 'b']), 'a')).toEqual(new Set(['b']))
+  })
+
+  it('leaves other ids alone', () => {
+    expect(toggleSelection(new Set(['a', 'b']), 'c')).toEqual(new Set(['a', 'b', 'c']))
+  })
+
+  it('does not mutate the set it was given', () => {
+    const before = new Set(['a'])
+    toggleSelection(before, 'b')
+    expect(before).toEqual(new Set(['a']))
+  })
+
+  it('a double-click leaves selection unchanged, whichever state it started in', () => {
+    for (const start of [new Set<string>(), new Set(['a']), new Set(['a', 'b'])]) {
+      const afterTwoClicks = toggleSelection(toggleSelection(start, 'a'), 'a')
+      expect(afterTwoClicks).toEqual(start)
+    }
+  })
+
+  it('three clicks land on the opposite state, as a plain toggle should', () => {
+    const once = toggleSelection(new Set<string>(), 'a')
+    const thrice = toggleSelection(toggleSelection(once, 'a'), 'a')
+    expect(thrice).toEqual(once)
   })
 })

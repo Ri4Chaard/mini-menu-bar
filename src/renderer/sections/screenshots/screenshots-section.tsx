@@ -7,7 +7,7 @@ import { FooterNote, HeaderAction, SectionChrome } from '../../components/sectio
 import { PreviewToggle } from '../../components/preview-toggle'
 import { IconButton } from '../../components/ui/icon-button'
 import { ScreenshotCard } from './screenshot-card'
-import { dragIdsFor, reconcileSelection } from './selection'
+import { dragIdsFor, reconcileSelection, toggleSelection } from './selection'
 
 /**
  * The collection is owned by App (the rail badge needs it too) and passed in,
@@ -46,11 +46,7 @@ export function ScreenshotsSection({
   }, [entries])
 
   const toggle = useCallback((id: string) => {
-    setSelected((current) => {
-      const next = new Set(current)
-      if (!next.delete(id)) next.add(id)
-      return next
-    })
+    setSelected((current) => toggleSelection(current, id))
   }, [])
 
   const act = useCallback(async (run: () => Promise<void>): Promise<void> => {

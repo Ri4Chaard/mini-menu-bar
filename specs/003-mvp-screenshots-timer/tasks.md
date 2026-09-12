@@ -96,11 +96,11 @@ poll is gone. Typecheck, lint and 277 tests green; renderer payload 332.5 → 31
 **Independent Test**: Click three thumbnails and confirm the selection count tracks exactly, with no
 file opening; double-click one and confirm it opens.
 
-- [ ] T024 [US2] Change the thumbnail button from `onOpen` to a selection toggle in `src/renderer/sections/screenshots/screenshot-card.tsx`, keeping the frame draggable so drag-out is unaffected (FR-097, FR-098)
-- [ ] T025 [US2] Add a `dblclick` handler on the same frame that calls `onOpen`, with **no click-delay timer** — FR-101 makes the naive implementation correct, and a deferral would make every selection feel laggy (R-206)
-- [ ] T026 [P] [US2] Replace the `Download` icon with a folder icon in `src/renderer/sections/screenshots/screenshot-card.tsx` — behaviour and `aria-label` are already correct, this is cosmetic only (FR-102)
-- [ ] T027 [US2] Make selection keyboard-operable and convey the selected state to assistive technology in `src/renderer/sections/screenshots/screenshot-card.tsx`, reconciling the existing corner checkbox badge so there are not two competing selection controls (FR-099)
-- [ ] T028 [US2] Update `tests/unit/renderer/screenshot-selection.spec.ts` for the new gesture mapping, including that a double-click leaves selection net-unchanged
+- [X] T024 [US2] Change the thumbnail button from `onOpen` to a selection toggle in `src/renderer/sections/screenshots/screenshot-card.tsx`, keeping the frame draggable so drag-out is unaffected (FR-097, FR-098)
+- [X] T025 [US2] Add a `dblclick` handler on the same frame that calls `onOpen`, with **no click-delay timer** — FR-101 makes the naive implementation correct, and a deferral would make every selection feel laggy (R-206)
+- [X] T026 [P] [US2] Replace the `Download` icon with a folder icon in `src/renderer/sections/screenshots/screenshot-card.tsx` — behaviour and `aria-label` are already correct, this is cosmetic only (FR-102)
+- [X] T027 [US2] Make selection keyboard-operable and convey the selected state to assistive technology in `src/renderer/sections/screenshots/screenshot-card.tsx`, reconciling the existing corner checkbox badge so there are not two competing selection controls (FR-099)
+- [X] T028 [US2] Update `tests/unit/renderer/screenshot-selection.spec.ts` for the new gesture mapping, including that a double-click leaves selection net-unchanged
 
 **Checkpoint**: Selection is the primary gesture and drag-out still works.
 
@@ -112,12 +112,12 @@ file opening; double-click one and confirm it opens.
 
 **Independent Test**: Type `7:30`, start, and confirm the countdown begins from 7 m 30 s.
 
-- [ ] T029 [P] [US3] Create `src/renderer/sections/timer/parse-duration.ts` as a pure parser implementing the format table in `data-model.md`, reusing `MIN_TIMER_PRESET_MS` and `MAX_TIMER_PRESET_MS` for bounds
-- [ ] T030 [P] [US3] Write `tests/unit/parse-duration.spec.ts` covering every row of that table, especially the deliberate split between **rejecting** unparseable input and **clamping** out-of-range input (FR-106 vs FR-107)
-- [ ] T031 [US3] Create `src/renderer/sections/timer/duration-input.tsx` — the existing large readout becomes editable on click or focus, `Enter` commits, blur reverts rather than committing a half-typed value
-- [ ] T032 [US3] Wire it into `src/renderer/sections/timer/timer-section.tsx`, removing the `Edit Presets` header action and the `Plus` control that spawns the next unused round number (FR-105)
-- [ ] T033 [US3] Implement the two-stage `Escape` rule — first `Escape` reverts the edit and keeps the panel open, a second dismisses the panel (R-208). This changes a Principle III guarantee and must be verified manually in T051
-- [ ] T034 [US3] Confirm `tests/unit/design-tokens.spec.ts` still passes — the editable readout must not add a row or disturb the asserted band arithmetic summing to 235
+- [X] T029 [P] [US3] Create `src/renderer/sections/timer/parse-duration.ts` as a pure parser implementing the format table in `data-model.md`, reusing `MIN_TIMER_PRESET_MS` and `MAX_TIMER_PRESET_MS` for bounds
+- [X] T030 [P] [US3] Write `tests/unit/parse-duration.spec.ts` covering every row of that table, especially the deliberate split between **rejecting** unparseable input and **clamping** out-of-range input (FR-106 vs FR-107)
+- [X] T031 [US3] Create `src/renderer/sections/timer/duration-input.tsx` — the existing large readout becomes editable on click or focus, `Enter` commits, blur reverts rather than committing a half-typed value
+- [X] T032 [US3] Wire it into `src/renderer/sections/timer/timer-section.tsx`, removing the `Edit Presets` header action and the `Plus` control that spawns the next unused round number (FR-105)
+- [X] T033 [US3] Implement the two-stage `Escape` rule — first `Escape` reverts the edit and keeps the panel open, a second dismisses the panel (R-208). This changes a Principle III guarantee and must be verified manually in T051
+- [X] T034 [US3] Confirm `tests/unit/design-tokens.spec.ts` still passes — the editable readout must not add a row or disturb the asserted band arithmetic summing to 235
 
 **Checkpoint**: Any duration is reachable by typing.
 

@@ -30,3 +30,21 @@ export function reconcileSelection(
 export function dragIdsFor(id: string, selected: ReadonlySet<string>): string[] {
   return selected.has(id) ? [...selected] : [id]
 }
+
+/**
+ * Toggle one id in or out of the selection.
+ *
+ * Lifted out of the component because feature 003 made this the section's
+ * PRIMARY gesture (FR-097), and because the double-click rule is a property of
+ * this function rather than of the DOM: applying it twice must return a set
+ * equal to the original, which is exactly what lets `dblclick` open a file
+ * without disturbing selection and without a click-delay (FR-101, R-206).
+ */
+export function toggleSelection(
+  selected: ReadonlySet<string>,
+  id: string
+): ReadonlySet<string> {
+  const next = new Set(selected)
+  if (!next.delete(id)) next.add(id)
+  return next
+}

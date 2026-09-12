@@ -1,4 +1,4 @@
-import { Check, Download } from 'lucide-react'
+import { Check, FolderOpen } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { ScreenshotEntry } from '@shared/types'
 
@@ -29,6 +29,19 @@ export function timeChipLabel(entry: ScreenshotEntry, now: number): string {
 /**
  * One thumbnail in the strip: 124x88 image, a corner selection badge, a
  * relative-time chip, and a 124x13 meta row beneath (FR-055, FR-056).
+ *
+ * Gestures, as settled by feature 003 (FR-097, FR-098, FR-101):
+ *
+ *   click     toggles selection - the whole thumbnail is the target
+ *   dblclick  opens the file
+ *   drag      hands the file to another application
+ *
+ * There is deliberately NO click-delay to disambiguate single from double.
+ * FR-101 specifies that a double-click leaves selection "unchanged from what
+ * the constituent clicks produced" - two toggles cancel out - so the naive
+ * implementation is the correct one, and selection stays instant. Do not
+ * "fix" this into a 250 ms deferral; that would make every selection feel
+ * laggy for no gain (research.md R-206).
  */
 export function ScreenshotCard({
   entry,
@@ -62,8 +75,12 @@ export function ScreenshotCard({
       >
         <button
           type="button"
-          onClick={() => onOpen(entry.id)}
-          aria-label={`Open ${entry.fileName}`}
+          role="checkbox"
+          aria-checked={selected}
+          onClick={() => onToggle(entry.id)}
+          onDoubleClick={() => onOpen(entry.id)}
+          aria-label={`Select ${entry.fileName}`}
+          title={`${entry.fileName} — click to select, double-click to open`}
           className="block size-full focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--color-accent)]"
         >
           {entry.thumbnailDataUrl ? (
@@ -76,20 +93,20 @@ export function ScreenshotCard({
           ) : null}
         </button>
 
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={selected}
-          aria-label={`Select ${entry.fileName}`}
-          onClick={() => onToggle(entry.id)}
-          className={`absolute top-1.5 left-1.5 flex size-5 items-center justify-center rounded-full transition-colors duration-[var(--duration-fast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)] ${
+        {/* An indicator, not a control. The thumbnail itself is the selection
+            target now, and a second checkbox over it would give one card two
+            competing selection controls (FR-099). Hidden from assistive
+            technology because the button beneath already announces the state. */}
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute top-1.5 left-1.5 flex size-5 items-center justify-center rounded-full transition-colors duration-[var(--duration-fast)] ${
             selected
               ? 'bg-[var(--color-accent)] text-[var(--color-on-accent)]'
               : 'bg-[var(--color-scrim)] text-transparent'
           }`}
         >
           <Check className="size-3" aria-hidden />
-        </button>
+        </span>
 
         <span className="absolute right-1.5 bottom-1.5 rounded-[var(--radius-chip)] bg-[var(--color-scrim)] px-1.5 py-0.5 text-[length:var(--text-micro)] text-[var(--color-on-accent)]">
           {timeChipLabel(entry, now)}
@@ -106,10 +123,12 @@ export function ScreenshotCard({
         <button
           type="button"
           onClick={() => onReveal(entry.id)}
-          aria-label={`Reveal ${entry.fileName} in Finder`}
+          aria-label={`Show ${entry.fileName} in Finder`}
           className="shrink-0 text-[var(--color-text-tertiary)] hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)]"
         >
-          <Download className="size-3.5" aria-hidden />
+          {/* A folder, not a download arrow: this reveals the file in place,
+              it does not fetch anything (FR-102). */}
+          <FolderOpen className="size-3.5" aria-hidden />
         </button>
       </div>
     </li>
