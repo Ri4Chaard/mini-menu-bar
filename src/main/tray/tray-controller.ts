@@ -6,7 +6,7 @@
  * polling of its own.
  */
 import { nativeImage, type NativeImage, type Tray } from 'electron'
-import type { PlaybackState, TimerState } from '@shared/types'
+import type { TimerState } from '@shared/types'
 import { DEFAULT_PREFERENCES } from '@shared/types'
 import type { PreferencesService } from '../services/preferences/preferences-service'
 import type { ScreenshotService } from '../services/screenshots/screenshot-store'
@@ -16,7 +16,6 @@ import { composePreview } from './preview-composer'
 export interface TrayController {
   refresh(): Promise<void>
   setTimer(state: TimerState): void
-  setPlayback(state: PlaybackState): void
   dispose(): void
 }
 
@@ -38,18 +37,6 @@ export function createTrayController(deps: TrayDeps): TrayController {
     deadlineAt: null,
     remainingMs: DEFAULT_PREFERENCES.timerDurationMs
   }
-  let playback: PlaybackState = {
-    availability: 'not-running',
-    trackName: null,
-    artist: null,
-    positionMs: null,
-    durationMs: null,
-    volume: null,
-    shuffling: null,
-    repeating: null,
-    artworkDataUrl: null
-  }
-
   let thumbnailFor: string | null = null
   let thumbnail: NativeImage | null = null
   let disposed = false
@@ -77,10 +64,9 @@ export function createTrayController(deps: TrayDeps): TrayController {
 
     const model = composePreview({
       preferences: prefs,
-      unseenCount: screenshots?.unseenCount() ?? 0,
+      screenshotCount: screenshots?.count() ?? 0,
       latestThumbnail,
-      timer,
-      playback
+      timer
     })
 
     // Screenshots are full-colour, so the thumbnail must not be treated as a
@@ -94,10 +80,6 @@ export function createTrayController(deps: TrayDeps): TrayController {
     refresh: apply,
     setTimer(state) {
       timer = state
-      void apply()
-    },
-    setPlayback(state) {
-      playback = state
       void apply()
     },
     dispose() {

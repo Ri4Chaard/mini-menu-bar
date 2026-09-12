@@ -309,7 +309,7 @@ rather than bundled in speculatively.
 the plan commits to measuring rather than assuming.
 
 **Rationale**: Deleting two of five sections, `lucide-react` icons used only by them, and the Spotify
-artwork path strictly reduces the renderer bundle from its current ~404 KB of `out/renderer` against
+artwork path strictly reduces the renderer bundle from its measured 332.5 KB against
 a 500 KB gate. The badge module lives in main and does not count toward that budget at all.
 
 The performance gate from the constitution ("any change touching timers, animation, polling, or the
@@ -320,6 +320,6 @@ changes the adapter. Baseline for the comparison, measured on this machine befor
 |---|---|
 | Idle CPU, previews on | 0.277% (0.18 s over 65 s) |
 | Memory, 4 processes | 96.7 MB physical footprint |
-| Renderer payload | ~404 KB of 500 KB gate |
+| Renderer payload | 332.5 KB of 500 KB gate |
 
 `quickstart.md` carries the re-measurement steps.

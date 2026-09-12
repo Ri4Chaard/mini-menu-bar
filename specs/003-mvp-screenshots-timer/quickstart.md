@@ -41,7 +41,7 @@ no longer exist; `tests/unit/tray-badge.spec.ts`, `parse-duration.spec.ts` and
 npm run build
 ```
 
-The build fails above 500 KB. Expected: **below the ~404 KB baseline**, since two sections are gone.
+The build fails above 500 KB. Expected: **below the 332.5 KB baseline**, since two sections are gone.
 Record the number — a payload that did not shrink means dead code is still reachable.
 
 ## Gate 3 — Browser mode (Principle I)
@@ -139,7 +139,7 @@ CPU to be reported. Baseline from [R-212](./research.md#r-212):
 |---|---|---|
 | Idle CPU, previews on | 0.277% | _record_ |
 | Memory, physical footprint | 96.7 MB | _record_ |
-| Renderer payload | ~404 KB | _record_ |
+| Renderer payload | 332.5 KB of 500 KB | _record_ |
 
 Measure CPU as a cumulative-time delta over a wall-clock window rather than sampling `top`, which
 drops processes in and out of its row list and gives unstable figures:

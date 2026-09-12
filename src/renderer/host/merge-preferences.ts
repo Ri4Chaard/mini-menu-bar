@@ -13,12 +13,7 @@ export function mergeForMock(current: Preferences, patch: Partial<Preferences>):
     ...patch,
     previews: {
       screenshots: patch.previews?.screenshots ?? current.previews.screenshots,
-      timer: patch.previews?.timer ?? current.previews.timer,
-      spotify: patch.previews?.spotify ?? current.previews.spotify
-    },
-    screenshotsSeenWatermark: Math.max(
-      current.screenshotsSeenWatermark,
-      patch.screenshotsSeenWatermark ?? 0
-    )
+      timer: patch.previews?.timer ?? current.previews.timer
+    }
   }
 }

@@ -31,9 +31,9 @@ Three build targets plus a browser target, per [plan.md](./plan.md): `src/main/`
 **Purpose**: Capture the pre-change state. This feature is measured against a baseline and rewrites a
 preferences file whose original is not otherwise recoverable.
 
-- [ ] T001 Back up the live preferences file to `/tmp/prefs-before.json` — it currently holds `lastSection: "spotify"`, `previews.spotify` and `screenshotsSeenWatermark`, which is the only real sample of the pre-migration shape and is destroyed on first write after T011
-- [ ] T002 [P] Record the pre-change renderer payload by running `npm run build` and writing the figure into the Gate 8 "Before" column of `specs/003-mvp-screenshots-timer/quickstart.md`
-- [ ] T003 [P] Confirm a green starting point: `npm run typecheck`, `npm run lint`, `npm test` all pass and the working tree is clean
+- [X] T001 Back up the live preferences file to `/tmp/prefs-before.json` — it currently holds `lastSection: "spotify"`, `previews.spotify` and `screenshotsSeenWatermark`, which is the only real sample of the pre-migration shape and is destroyed on first write after T011
+- [X] T002 [P] Record the pre-change renderer payload by running `npm run build` and writing the figure into the Gate 8 "Before" column of `specs/003-mvp-screenshots-timer/quickstart.md`
+- [X] T003 [P] Confirm a green starting point: `npm run typecheck`, `npm run lint`, `npm test` all pass and the working tree is clean
 
 **Checkpoint**: Baseline captured, original preferences preserved.
 
@@ -46,16 +46,16 @@ is what lets US1–US5 proceed without fighting over `types.ts`, `channels.ts` a
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T004 Narrow `SectionId` and `SECTION_IDS` to `'screenshots' | 'timer'`, remove `PreviewPreferences.spotify`, remove `screenshotsSeenWatermark` from `Preferences`, and delete the `PlaybackState` and `Note` types in `src/shared/types.ts`
-- [ ] T005 Remove the 17 Spotify/Notes/Copy/mark-seen channels from `src/shared/channels.ts` so it matches `specs/003-mvp-screenshots-timer/contracts/ipc-channels.md` exactly
-- [ ] T006 Remove the 11 Spotify/Notes/Copy/mark-seen methods from `src/renderer/host/host-contract.ts` per `contracts/host-bridge.md`
-- [ ] T007 [P] Remove the same methods from `src/renderer/host/host-bridge.ts`
-- [ ] T008 [P] Remove the same methods and delete the Spotify/Notes fixture data from `src/renderer/host/host-mock.ts`
-- [ ] T009 Remove the corresponding `contextBridge` methods from `src/preload/index.ts`
-- [ ] T010 Remove the corresponding `ipcMain` handlers from `src/main/ipc/register.ts`
-- [ ] T011 Extend `revivePreferences` in `src/main/services/preferences/preferences-service.ts` to map a `lastSection` of `spotify`/`notes` to `screenshots` and to drop `previews.spotify` and `screenshotsSeenWatermark` on read, and remove the `spotify` key from the `mergePreferences` preview merge (R-209)
-- [ ] T012 [P] Write `tests/unit/preferences-migration.spec.ts` asserting that the exact JSON shape captured in T001 migrates cleanly and that removed fields are never written back — this is a P1 path, not a defensive one
-- [ ] T013 Update `tests/contract/host-bridge.spec.ts` to assert the exact surviving method set and that the mock and real binding expose identical key sets, so a re-added method fails the suite
+- [X] T004 Narrow `SectionId` and `SECTION_IDS` to `'screenshots' | 'timer'`, remove `PreviewPreferences.spotify`, remove `screenshotsSeenWatermark` from `Preferences`, and delete the `PlaybackState` and `Note` types in `src/shared/types.ts`
+- [X] T005 Remove the 17 Spotify/Notes/Copy/mark-seen channels from `src/shared/channels.ts` so it matches `specs/003-mvp-screenshots-timer/contracts/ipc-channels.md` exactly
+- [X] T006 Remove the 11 Spotify/Notes/Copy/mark-seen methods from `src/renderer/host/host-contract.ts` per `contracts/host-bridge.md`
+- [X] T007 [P] Remove the same methods from `src/renderer/host/host-bridge.ts`
+- [X] T008 [P] Remove the same methods and delete the Spotify/Notes fixture data from `src/renderer/host/host-mock.ts`
+- [X] T009 Remove the corresponding `contextBridge` methods from `src/preload/index.ts` — **no change required**: the preload derives its allowlist from `ALL_INVOKE_CHANNELS`/`ALL_EVENT_CHANNELS`, so it tightened automatically with T005. Verified, not edited.
+- [X] T010 Remove the corresponding `ipcMain` handlers from `src/main/ipc/register.ts`
+- [X] T011 Extend `revivePreferences` in `src/main/services/preferences/preferences-service.ts` to map a `lastSection` of `spotify`/`notes` to `screenshots` and to drop `previews.spotify` and `screenshotsSeenWatermark` on read, and remove the `spotify` key from the `mergePreferences` preview merge (R-209)
+- [X] T012 [P] Write `tests/unit/preferences-migration.spec.ts` asserting that the exact JSON shape captured in T001 migrates cleanly and that removed fields are never written back — this is a P1 path, not a defensive one
+- [X] T013 Update `tests/contract/host-bridge.spec.ts` to assert the exact surviving method set and that the mock and real binding expose identical key sets, so a re-added method fails the suite
 
 **Checkpoint**: The native boundary is its final shape. User stories can now proceed.
 
@@ -68,19 +68,24 @@ is what lets US1–US5 proceed without fighting over `types.ts`, `channels.ts` a
 **Independent Test**: Launch and confirm only Screenshots, Timer and Settings are reachable, no Copy
 control exists, and no automation permission is requested even with the music app playing.
 
-- [ ] T014 [P] [US1] Delete `src/main/services/spotify/` (applescript.ts, artwork.ts, playback-service.ts)
-- [ ] T015 [P] [US1] Delete `src/main/services/notes/`
-- [ ] T016 [P] [US1] Delete `src/renderer/sections/spotify/`
-- [ ] T017 [P] [US1] Delete `src/renderer/sections/notes/`
-- [ ] T018 [US1] Remove the Spotify and Notes entries from `src/renderer/sections/registry.ts` — `PREVIEWABLE_SECTIONS` and the Settings toggle list derive from this array, so the settings UI corrects itself (FR-091, FR-092)
-- [ ] T019 [US1] Remove the playback and notes service construction, the `setPreviewActive` call and the tray `setPlayback` wiring from `src/main/index.ts`
-- [ ] T020 [US1] Remove the Spotify segment and the `PlaybackState` input from `src/main/tray/preview-composer.ts`, and remove `setPlayback` from `src/main/tray/tray-controller.ts`
-- [ ] T021 [US1] Remove the Copy control from `src/renderer/sections/screenshots/screenshots-section.tsx`, remove the copy path from `src/main/services/screenshots/actions.ts`, and delete `src/main/services/screenshots/clipboard.ts` (FR-096, R-210)
-- [ ] T022 [P] [US1] Delete `tests/unit/clipboard-mode.spec.ts` and `tests/unit/artwork-cache.spec.ts`
-- [ ] T023 [US1] Remove `com.apple.security.automation.apple-events` from `build/entitlements.mac.plist` and `NSAppleEventsUsageDescription` from `electron-builder.yml`, leaving `NSDesktopFolderUsageDescription` and `allow-jit` in place (R-211)
+- [X] T014 [P] [US1] Delete `src/main/services/spotify/` (applescript.ts, artwork.ts, playback-service.ts)
+- [X] T015 [P] [US1] Delete `src/main/services/notes/`
+- [X] T016 [P] [US1] Delete `src/renderer/sections/spotify/`
+- [X] T017 [P] [US1] Delete `src/renderer/sections/notes/`
+- [X] T018 [US1] Remove the Spotify and Notes entries from `src/renderer/sections/registry.ts` — `PREVIEWABLE_SECTIONS` and the Settings toggle list derive from this array, so the settings UI corrects itself (FR-091, FR-092)
+- [X] T019 [US1] Remove the playback and notes service construction, the `setPreviewActive` call and the tray `setPlayback` wiring from `src/main/index.ts`
+- [X] T020 [US1] Remove the Spotify segment and the `PlaybackState` input from `src/main/tray/preview-composer.ts`, and remove `setPlayback` from `src/main/tray/tray-controller.ts`
+- [X] T021 [US1] Remove the Copy control from `src/renderer/sections/screenshots/screenshots-section.tsx`, remove the copy path from `src/main/services/screenshots/actions.ts`, and delete `src/main/services/screenshots/clipboard.ts` (FR-096, R-210)
+- [X] T022 [P] [US1] Delete `tests/unit/clipboard-mode.spec.ts` and `tests/unit/artwork-cache.spec.ts`
+- [X] T023 [US1] Remove `com.apple.security.automation.apple-events` from `build/entitlements.mac.plist` and `NSAppleEventsUsageDescription` from `electron-builder.yml`, leaving `NSDesktopFolderUsageDescription` and `allow-jit` in place (R-211)
 
 **Checkpoint**: The app is two features. Idle CPU should already have fallen — the 2 s `osascript`
-poll is gone.
+poll is gone. Typecheck, lint and 277 tests green; renderer payload 332.5 → 316.4 KB.
+
+> **Pulled forward from US4**: removing `screenshotsSeenWatermark` in T004 made `markSeen()`,
+> `unseenCount()` and `isSeen` uncompilable, so the store half of **T037** and the spec rewrite half
+> of **T040** landed here rather than in Phase 6 — the MVP could not be green otherwise. The rail's
+> unseen badge became a total count for the same reason. T037/T040 are marked where they sit.
 
 ---
 

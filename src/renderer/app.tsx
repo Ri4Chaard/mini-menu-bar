@@ -6,8 +6,6 @@ import { Rail, type ActiveSection } from './components/rail'
 import { m, useFadeIn } from './motion'
 import { ScreenshotsSection } from './sections/screenshots/screenshots-section'
 import { TimerSection } from './sections/timer/timer-section'
-import { SpotifySection } from './sections/spotify/spotify-section'
-import { NotesSection } from './sections/notes/notes-section'
 import { SettingsSection } from './sections/settings/settings-section'
 
 export function App(): ReactNode {
@@ -52,25 +50,24 @@ export function App(): ReactNode {
     [host]
   )
 
-  const unseenCount = screenshots.filter((s) => !s.isSeen).length
+  // The total, matching the menu bar badge: viewing no longer changes it (FR-112).
+  const screenshotCount = screenshots.length
 
   // Preferences are held here rather than inside Settings so the footer toggle
-  // and the Settings checkbox read one lifted value. Flipping the switch in the
-  // Spotify footer re-renders the Settings checkbox with no extra wiring
+  // and the Settings checkbox read one lifted value. Flipping the switch in a
+  // section footer re-renders the Settings checkbox with no extra wiring
   // (FR-078, research.md R-114).
   const shared = { preferences: prefs, onUpdatePreferences: updatePrefs }
 
   return (
     <PanelShell>
-      <Rail active={active} onSelect={select} unseenCount={unseenCount} />
+      <Rail active={active} onSelect={select} screenshotCount={screenshotCount} />
       {/* Only the body content cross-fades. The rail and the band structure
           stay fixed - animating them would read as the whole panel redrawing
           (FR-046, R-115). */}
       <m.main key={active} {...fade} className="flex min-w-0 flex-1 flex-col">
         {active === 'screenshots' ? <ScreenshotsSection entries={screenshots} {...shared} /> : null}
         {active === 'timer' ? <TimerSection {...shared} /> : null}
-        {active === 'spotify' ? <SpotifySection {...shared} /> : null}
-        {active === 'notes' ? <NotesSection {...shared} /> : null}
         {active === 'settings' ? <SettingsSection {...shared} /> : null}
       </m.main>
     </PanelShell>

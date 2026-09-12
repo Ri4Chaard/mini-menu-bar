@@ -23,7 +23,6 @@ const entry = (id: string): ScreenshotEntry => ({
   width: 100,
   height: 100,
   isTemporary: false,
-  isSeen: true
 })
 
 describe('reconcileSelection', () => {

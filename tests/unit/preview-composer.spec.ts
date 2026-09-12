@@ -2,15 +2,14 @@
  * Preview composer - constitution Principle IV requires pure-function logic to
  * be unit-tested, and this is the piece most exposed to fiddly truncation and
  * ordering bugs (research.md R-005).
+ *
+ * Feature 003 changed what this composes. The screenshot count left the title
+ * and became a badge on the image (FR-109), the Spotify segment is gone, and
+ * the count is now the total rather than an unseen subset (FR-110).
  */
 import { describe, it, expect } from 'vitest'
-import {
-  composePreview,
-  formatRemaining,
-  TITLE_BUDGET,
-  TRACK_BUDGET
-} from '../../src/main/tray/preview-composer'
-import { DEFAULT_PREFERENCES, type PlaybackState, type Preferences, type TimerState } from '../../src/shared/types'
+import { composePreview, formatRemaining, TITLE_BUDGET } from '../../src/main/tray/preview-composer'
+import { DEFAULT_PREFERENCES, type Preferences, type TimerState } from '../../src/shared/types'
 
 const prefs = (over: Partial<Preferences['previews']> = {}): Preferences => ({
   ...DEFAULT_PREFERENCES,
@@ -26,18 +25,7 @@ const timer = (over: Partial<TimerState> = {}): TimerState => ({
   ...over
 })
 
-const playback = (over: Partial<PlaybackState> = {}): PlaybackState => ({
-  availability: 'playing',
-  trackName: 'Teardrop',
-  artist: 'Massive Attack',
-  volume: 65,
-  shuffling: false,
-  repeating: false,
-  artworkDataUrl: null,
-  positionMs: 1000,
-  durationMs: 330_000,
-  ...over
-})
+const thumb = { fake: true } as never
 
 describe('formatRemaining', () => {
   it('renders minutes and seconds zero-padded', () => {
@@ -54,162 +42,151 @@ describe('formatRemaining', () => {
   })
 })
 
-describe('composePreview', () => {
+describe('composePreview — title', () => {
   it('produces an empty title when all previews are off', () => {
     const { title } = composePreview({
       preferences: prefs(),
-      unseenCount: 4,
-      latestThumbnail: null,
-      timer: timer(),
-      playback: playback()
+      screenshotCount: 4,
+      latestThumbnail: thumb,
+      timer: timer()
     })
     expect(title).toBe('')
   })
 
-  it('shows the unseen count only when the screenshots preview is on', () => {
-    const on = composePreview({
-      preferences: prefs({ screenshots: true }),
-      unseenCount: 3,
-      latestThumbnail: null,
-      timer: timer(),
-      playback: playback()
-    })
-    expect(on.title).toContain('3')
-
-    const off = composePreview({
-      preferences: prefs(),
-      unseenCount: 3,
-      latestThumbnail: null,
-      timer: timer(),
-      playback: playback()
-    })
-    expect(off.title).not.toContain('3')
-  })
-
-  it('omits the count segment when nothing is unseen', () => {
+  it('never puts the screenshot count in the title — it belongs on the image now', () => {
     const { title } = composePreview({
       preferences: prefs({ screenshots: true }),
-      unseenCount: 0,
-      latestThumbnail: null,
-      timer: timer(),
-      playback: playback()
+      screenshotCount: 7,
+      latestThumbnail: thumb,
+      timer: timer({ status: 'idle' })
     })
     expect(title).toBe('')
+    expect(title).not.toContain('7')
   })
 
   it('shows the countdown only while a timer is running or paused', () => {
     const running = composePreview({
       preferences: prefs({ timer: true }),
-      unseenCount: 0,
+      screenshotCount: 0,
       latestThumbnail: null,
-      timer: timer(),
-      playback: playback()
+      timer: timer()
     })
     expect(running.title).toContain('2:05')
 
     const idle = composePreview({
       preferences: prefs({ timer: true }),
-      unseenCount: 0,
+      screenshotCount: 0,
       latestThumbnail: null,
-      timer: timer({ status: 'idle', remainingMs: 300_000, deadlineAt: null }),
-      playback: playback()
+      timer: timer({ status: 'idle', remainingMs: 300_000, deadlineAt: null })
     })
     expect(idle.title).toBe('')
   })
 
-  it('shows the track name only when playing or paused', () => {
-    const playing = composePreview({
-      preferences: prefs({ spotify: true }),
-      unseenCount: 0,
+  it('marks a paused countdown as paused', () => {
+    const { title } = composePreview({
+      preferences: prefs({ timer: true }),
+      screenshotCount: 0,
       latestThumbnail: null,
-      timer: timer({ status: 'idle' }),
-      playback: playback()
+      timer: timer({ status: 'paused', deadlineAt: null })
     })
-    expect(playing.title).toContain('Teardrop')
-
-    for (const availability of ['not-running', 'permission-denied', 'stopped'] as const) {
-      const off = composePreview({
-        preferences: prefs({ spotify: true }),
-        unseenCount: 0,
-        latestThumbnail: null,
-        timer: timer({ status: 'idle' }),
-        playback: playback({ availability, trackName: null })
-      })
-      expect(off.title).toBe('')
-    }
+    expect(title).toContain('paused')
   })
 
-  it('keeps segment order fixed so the menu bar does not reshuffle as previews toggle', () => {
+  it('caps the title even with an hours-long countdown (FR-035)', () => {
     const { title } = composePreview({
-      preferences: prefs({ screenshots: true, timer: true, spotify: true }),
-      unseenCount: 2,
-      latestThumbnail: null,
-      timer: timer(),
-      playback: playback()
-    })
-    const countAt = title.indexOf('2')
-    const timerAt = title.indexOf('2:05')
-    const trackAt = title.indexOf('Teardrop')
-    expect(countAt).toBeLessThan(timerAt)
-    expect(timerAt).toBeLessThan(trackAt)
-  })
-
-  it('truncates an overlong track name rather than displacing menu bar items (FR-035)', () => {
-    const long = 'A Song With A Deliberately Very Long Title That Would Push Everything Off Screen'
-    const { title } = composePreview({
-      preferences: prefs({ spotify: true }),
-      unseenCount: 0,
-      latestThumbnail: null,
-      timer: timer({ status: 'idle' }),
-      playback: playback({ trackName: long })
-    })
-    expect(title.length).toBeLessThanOrEqual(TITLE_BUDGET)
-    expect(title).toContain('…')
-    expect(title).not.toContain('Off Screen')
-  })
-
-  it('caps the whole title even with every segment at maximum length', () => {
-    const { title } = composePreview({
-      preferences: prefs({ screenshots: true, timer: true, spotify: true }),
-      unseenCount: 9999,
-      latestThumbnail: null,
-      timer: timer({ remainingMs: 3_725_000 }),
-      playback: playback({ trackName: 'X'.repeat(TRACK_BUDGET * 4) })
+      preferences: prefs({ screenshots: true, timer: true }),
+      screenshotCount: 9999,
+      latestThumbnail: thumb,
+      timer: timer({ remainingMs: 3_725_000 })
     })
     expect(title.length).toBeLessThanOrEqual(TITLE_BUDGET)
   })
+})
 
+describe('composePreview — image and badge', () => {
   it('uses the screenshot thumbnail only when that preview is on', () => {
-    const thumb = { fake: true } as never
     expect(
       composePreview({
         preferences: prefs({ screenshots: true }),
-        unseenCount: 1,
+        screenshotCount: 1,
         latestThumbnail: thumb,
-        timer: timer({ status: 'idle' }),
-        playback: playback({ availability: 'not-running' })
+        timer: timer({ status: 'idle' })
       }).image
     ).toBe(thumb)
 
     expect(
       composePreview({
         preferences: prefs({ screenshots: false }),
-        unseenCount: 1,
+        screenshotCount: 1,
         latestThumbnail: thumb,
-        timer: timer({ status: 'idle' }),
-        playback: playback({ availability: 'not-running' })
+        timer: timer({ status: 'idle' })
       }).image
     ).toBeNull()
   })
 
-  it('is pure - the same input always yields the same output', () => {
-    const input = {
-      preferences: prefs({ screenshots: true, timer: true, spotify: true }),
-      unseenCount: 5,
-      latestThumbnail: null,
-      timer: timer(),
-      playback: playback()
+  it('reports the total count, not an unseen subset (FR-110)', () => {
+    expect(
+      composePreview({
+        preferences: prefs({ screenshots: true }),
+        screenshotCount: 12,
+        latestThumbnail: thumb,
+        timer: timer({ status: 'idle' })
+      }).badgeCount
+    ).toBe(12)
+  })
+
+  /**
+   * The guard FR-115 exists for: with no thumbnail the tray falls back to the
+   * app icon, and a badge must not follow it there. A "0" painted over the wine
+   * glass is precisely the bug the user reported in a different form.
+   */
+  it('reports no badge when there is no thumbnail to carry it (FR-114)', () => {
+    expect(
+      composePreview({
+        preferences: prefs({ screenshots: true }),
+        screenshotCount: 0,
+        latestThumbnail: null,
+        timer: timer({ status: 'idle' })
+      }).badgeCount
+    ).toBe(0)
+  })
+
+  it('reports no badge when the screenshots preview is off, however many exist', () => {
+    const { image, badgeCount } = composePreview({
+      preferences: prefs({ screenshots: false }),
+      screenshotCount: 42,
+      latestThumbnail: thumb,
+      timer: timer({ status: 'idle' })
+    })
+    expect(image).toBeNull()
+    expect(badgeCount).toBe(0)
+  })
+
+  it('never reports a badge without an image to put it on', () => {
+    for (const count of [0, 1, 50]) {
+      for (const screenshots of [true, false]) {
+        for (const latestThumbnail of [thumb, null]) {
+          const model = composePreview({
+            preferences: prefs({ screenshots }),
+            screenshotCount: count,
+            latestThumbnail,
+            timer: timer({ status: 'idle' })
+          })
+          if (model.badgeCount > 0) expect(model.image).not.toBeNull()
+        }
+      }
     }
-    expect(composePreview(input).title).toBe(composePreview(input).title)
+  })
+})
+
+describe('composePreview — purity', () => {
+  it('the same input always yields the same output', () => {
+    const input = {
+      preferences: prefs({ screenshots: true, timer: true }),
+      screenshotCount: 5,
+      latestThumbnail: thumb,
+      timer: timer()
+    }
+    expect(composePreview(input)).toEqual(composePreview(input))
   })
 })

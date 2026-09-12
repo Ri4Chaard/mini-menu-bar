@@ -22,11 +22,9 @@ mac:
   # A menu bar utility has no Dock presence and no main window.
   extendInfo:
     LSUIElement: true
-    # Required for Apple Events. Without this key macOS kills the process rather
-    # than prompting, so Spotify control silently never works (research.md R-007).
-    NSAppleEventsUsageDescription: >-
-      Mini Menu Bar uses automation to show what Spotify is playing and to
-      control playback from the menu bar.
+    # NSAppleEventsUsageDescription was removed with Spotify (feature 003): the
+    # app no longer sends Apple Events, so macOS never prompts for automation
+    # access (research.md R-211).
     NSDesktopFolderUsageDescription: >-
       Mini Menu Bar reads your Desktop to show recent screenshots. It never
       modifies, moves, or deletes any file.

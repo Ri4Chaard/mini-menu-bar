@@ -1,4 +1,4 @@
-import { Camera, Timer, Music, StickyNote, Settings, type LucideIcon } from 'lucide-react'
+import { Camera, Timer, Settings, type LucideIcon } from 'lucide-react'
 import type { SectionId } from '@shared/types'
 
 export interface SectionDefinition {
@@ -6,18 +6,17 @@ export interface SectionDefinition {
   label: string
   icon: LucideIcon
   /**
-   * FR-028: Notes has no menu bar preview. Encoding it here means the settings
-   * UI derives its toggle list rather than hard-coding one, so the two can
-   * never drift apart.
+   * Encoding this here means the settings UI derives its toggle list rather
+   * than hard-coding one, so the two can never drift apart. Both surviving
+   * sections are previewable; the flag is retained because Settings is not,
+   * and because the next non-previewable section must not require a rewrite.
    */
   supportsPreview: boolean
 }
 
 export const SECTIONS: readonly SectionDefinition[] = [
   { id: 'screenshots', label: 'Screenshots', icon: Camera, supportsPreview: true },
-  { id: 'timer', label: 'Timer', icon: Timer, supportsPreview: true },
-  { id: 'spotify', label: 'Spotify', icon: Music, supportsPreview: true },
-  { id: 'notes', label: 'Notes', icon: StickyNote, supportsPreview: false }
+  { id: 'timer', label: 'Timer', icon: Timer, supportsPreview: true }
 ]
 
 export const SETTINGS_SECTION: SectionDefinition = {

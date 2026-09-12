@@ -7,8 +7,6 @@
  */
 import { EVENT_CHANNELS, INVOKE_CHANNELS } from '@shared/channels'
 import type {
-  Note,
-  PlaybackState,
   Preferences,
   ScreenshotEntry,
   SourceError,
@@ -44,9 +42,7 @@ export function createElectronBridge(): HostBridge {
     listScreenshots: () => call<ScreenshotEntry[]>(INVOKE_CHANNELS.screenshotsList),
     openScreenshot: (id) => call<void>(INVOKE_CHANNELS.screenshotsOpen, { id }),
     revealScreenshot: (id) => call<void>(INVOKE_CHANNELS.screenshotsReveal, { id }),
-    markScreenshotsSeen: () => call<void>(INVOKE_CHANNELS.screenshotsMarkSeen),
     getScreenshotSourceError: () => call<SourceError | null>(INVOKE_CHANNELS.screenshotsSourceError),
-    copyScreenshots: (ids) => call<void>(INVOKE_CHANNELS.screenshotsCopy, { ids }),
     deleteScreenshots: (ids) => call<void>(INVOKE_CHANNELS.screenshotsDelete, { ids }),
     startScreenshotDrag: (ids) => call<void>(INVOKE_CHANNELS.screenshotsStartDrag, { ids }),
     onScreenshotsChanged: (cb) => on<ScreenshotEntry[]>(EVENT_CHANNELS.screenshotsChanged, cb),
@@ -58,32 +54,6 @@ export function createElectronBridge(): HostBridge {
     resetTimer: () => call<TimerState>(INVOKE_CHANNELS.timerReset),
     dismissTimerAlarm: () => call<TimerState>(INVOKE_CHANNELS.timerDismissAlarm),
     onTimerStateChanged: (cb) => on<TimerState>(EVENT_CHANNELS.timerChanged, cb),
-
-    getPlaybackState: () => call<PlaybackState>(INVOKE_CHANNELS.spotifyGet),
-    togglePlayPause: () => call<void>(INVOKE_CHANNELS.spotifyToggle),
-    nextTrack: () => call<void>(INVOKE_CHANNELS.spotifyNext),
-    previousTrack: () => call<void>(INVOKE_CHANNELS.spotifyPrevious),
-    seekTo: (positionMs) => call<void>(INVOKE_CHANNELS.spotifySeek, { positionMs }),
-    setVolume: (volume) => call<void>(INVOKE_CHANNELS.spotifySetVolume, { volume }),
-    setShuffle: (shuffling) => call<void>(INVOKE_CHANNELS.spotifySetShuffle, { shuffling }),
-    setRepeat: (repeating) => call<void>(INVOKE_CHANNELS.spotifySetRepeat, { repeating }),
-    onPlaybackStateChanged: (cb) => {
-      // Polling starts on first subscribe and stops on last unsubscribe. Without
-      // telling main, polling would either run forever — breaking the idle-CPU
-      // budget — or never start (contracts/ipc-channels.md).
-      void call<void>(INVOKE_CHANNELS.spotifySubscribe, { active: true })
-      const off = on<PlaybackState>(EVENT_CHANNELS.spotifyChanged, cb)
-      return () => {
-        off()
-        void call<void>(INVOKE_CHANNELS.spotifySubscribe, { active: false })
-      }
-    },
-
-    listNotes: () => call<Note[]>(INVOKE_CHANNELS.notesList),
-    createNote: () => call<Note>(INVOKE_CHANNELS.notesCreate),
-    updateNote: (id, content) => call<Note>(INVOKE_CHANNELS.notesUpdate, { id, content }),
-    deleteNote: (id) => call<void>(INVOKE_CHANNELS.notesDelete, { id }),
-    flushNotes: () => call<void>(INVOKE_CHANNELS.notesFlush),
 
     getPreferences: () => call<Preferences>(INVOKE_CHANNELS.prefsGet),
     updatePreferences: (patch) => call<Preferences>(INVOKE_CHANNELS.prefsUpdate, patch),

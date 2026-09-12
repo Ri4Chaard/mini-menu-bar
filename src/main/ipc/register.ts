@@ -14,23 +14,16 @@ import { app, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { BridgeError, serializeError } from '@shared/errors'
 import { INVOKE_CHANNELS, type InvokeChannel } from '@shared/channels'
 import {
-  clamp,
-  requireBoolean,
   requireId,
   requireNullableString,
   requirePositiveDuration,
-  requireFiniteNumber,
   requireIdArray,
-  requireObject,
-  requireString,
-  requireVolume
+  requireObject
 } from './validate'
 import { MAX_SCREENSHOTS, type Preferences } from '@shared/types'
 import type { PreferencesService } from '../services/preferences/preferences-service'
 import type { ScreenshotService } from '../services/screenshots/screenshot-store'
 import type { TimerService } from '../services/timer/timer-service'
-import type { PlaybackService } from '../services/spotify/playback-service'
-import type { NotesService } from '../services/notes/notes-service'
 import type { ShortcutService } from '../services/shortcuts/shortcut-service'
 import type { PanelController } from '../window/panel-window'
 
@@ -39,8 +32,6 @@ export interface AppServices {
   panel: PanelController
   screenshots?: ScreenshotService
   timer?: TimerService
-  playback?: PlaybackService
-  notes?: NotesService
   shortcuts?: ShortcutService
 }
 
@@ -76,12 +67,8 @@ export function registerIpcHandlers(services: AppServices): void {
       need(services.screenshots, 'Screenshots').open(requireId(p)),
     [INVOKE_CHANNELS.screenshotsReveal]: (p) =>
       need(services.screenshots, 'Screenshots').reveal(requireId(p)),
-    [INVOKE_CHANNELS.screenshotsMarkSeen]: () => need(services.screenshots, 'Screenshots').markSeen(),
     [INVOKE_CHANNELS.screenshotsSourceError]: () =>
       need(services.screenshots, 'Screenshots').sourceError(),
-    [INVOKE_CHANNELS.screenshotsCopy]: (p) =>
-      // Ids, not paths - main resolves them against its own store.
-      need(services.screenshots, 'Screenshots').copy(requireIdArray(p, MAX_SCREENSHOTS)),
     [INVOKE_CHANNELS.screenshotsDelete]: (p) =>
       need(services.screenshots, 'Screenshots').remove(requireIdArray(p, MAX_SCREENSHOTS)),
     [INVOKE_CHANNELS.screenshotsStartDrag]: async (p, event) => {
@@ -101,35 +88,6 @@ export function registerIpcHandlers(services: AppServices): void {
     [INVOKE_CHANNELS.timerResume]: () => need(services.timer, 'Timer').resume(),
     [INVOKE_CHANNELS.timerReset]: () => need(services.timer, 'Timer').reset(),
     [INVOKE_CHANNELS.timerDismissAlarm]: () => need(services.timer, 'Timer').dismissAlarm(),
-
-    // ---- Spotify -----------------------------------------------------------
-    [INVOKE_CHANNELS.spotifyGet]: () => need(services.playback, 'Spotify').get(),
-    [INVOKE_CHANNELS.spotifyToggle]: () => need(services.playback, 'Spotify').toggle(),
-    [INVOKE_CHANNELS.spotifyNext]: () => need(services.playback, 'Spotify').next(),
-    [INVOKE_CHANNELS.spotifyPrevious]: () => need(services.playback, 'Spotify').previous(),
-    [INVOKE_CHANNELS.spotifySeek]: async (p) => {
-      const service = need(services.playback, 'Spotify')
-      const requested = requireFiniteNumber(p, 'positionMs')
-      const state = await service.get()
-      // Clamp to [0, duration] before it reaches AppleScript.
-      await service.seek(clamp(requested, 0, state.durationMs ?? 0))
-    },
-    [INVOKE_CHANNELS.spotifySubscribe]: (p) =>
-      need(services.playback, 'Spotify').setSubscribed(requireBoolean(p, 'active')),
-    [INVOKE_CHANNELS.spotifySetVolume]: (p) =>
-      need(services.playback, 'Spotify').setVolume(requireVolume(p)),
-    [INVOKE_CHANNELS.spotifySetShuffle]: (p) =>
-      need(services.playback, 'Spotify').setShuffle(requireBoolean(p, 'shuffling')),
-    [INVOKE_CHANNELS.spotifySetRepeat]: (p) =>
-      need(services.playback, 'Spotify').setRepeat(requireBoolean(p, 'repeating')),
-
-    // ---- Notes -------------------------------------------------------------
-    [INVOKE_CHANNELS.notesList]: () => need(services.notes, 'Notes').list(),
-    [INVOKE_CHANNELS.notesCreate]: () => need(services.notes, 'Notes').create(),
-    [INVOKE_CHANNELS.notesUpdate]: (p) =>
-      need(services.notes, 'Notes').update(requireId(p), requireString(p, 'content')),
-    [INVOKE_CHANNELS.notesDelete]: (p) => need(services.notes, 'Notes').remove(requireId(p)),
-    [INVOKE_CHANNELS.notesFlush]: () => need(services.notes, 'Notes').flush(),
 
     // ---- Preferences -------------------------------------------------------
     [INVOKE_CHANNELS.prefsGet]: () => services.preferences.get(),

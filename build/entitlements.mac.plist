@@ -2,10 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
   <dict>
-    <!-- Required to send Apple Events to Spotify under the hardened runtime. -->
-    <key>com.apple.security.automation.apple-events</key>
-    <true/>
-    <!-- osascript and mdfind run as child processes. -->
+    <!-- mdfind runs as a child process. -->
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
   </dict>

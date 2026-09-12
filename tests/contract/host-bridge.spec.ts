@@ -15,18 +15,28 @@ import { ALL_INVOKE_CHANNELS, INVOKE_CHANNELS, EVENT_CHANNELS } from '../../src/
 import type { HostBridge } from '../../src/renderer/host/host-contract'
 
 const CONTRACT_METHODS: (keyof HostBridge)[] = [
-  'listScreenshots', 'openScreenshot', 'revealScreenshot', 'markScreenshotsSeen',
-  'onScreenshotsChanged', 'getScreenshotSourceError', 'copyScreenshots', 'deleteScreenshots',
+  'listScreenshots', 'openScreenshot', 'revealScreenshot',
+  'onScreenshotsChanged', 'getScreenshotSourceError', 'deleteScreenshots',
   'startScreenshotDrag',
   'getTimerState', 'startTimer', 'pauseTimer', 'resumeTimer', 'resetTimer', 'onTimerStateChanged',
   'dismissTimerAlarm',
-  'getPlaybackState', 'togglePlayPause', 'nextTrack', 'previousTrack', 'seekTo', 'onPlaybackStateChanged',
-  'setVolume', 'setShuffle', 'setRepeat',
-  'listNotes', 'createNote', 'updateNote', 'deleteNote', 'flushNotes',
   'getPreferences', 'updatePreferences', 'setTimerShortcut',
   'closePanel', 'onPanelShown', 'quitApp',
   'getEnvironment', 'supportsNativeFeatures'
 ]
+
+/**
+ * Feature 003 removed these sixteen. Asserting their ABSENCE is the point:
+ * structural parity alone would pass happily if a method were quietly restored
+ * to both implementations, and the contract requires a re-introduction to be a
+ * deliberate, reviewed act (contracts/host-bridge.md).
+ */
+const REMOVED_METHODS = [
+  'markScreenshotsSeen', 'copyScreenshots',
+  'getPlaybackState', 'togglePlayPause', 'nextTrack', 'previousTrack', 'seekTo',
+  'onPlaybackStateChanged', 'setVolume', 'setShuffle', 'setRepeat',
+  'listNotes', 'createNote', 'updateNote', 'deleteNote', 'flushNotes'
+] as const
 
 // ============================================================================
 // Part 1 — behavioural contract, run against the mock
@@ -80,13 +90,6 @@ describe('HostBridge contract — mock implementation', () => {
       expect(await host.getScreenshotSourceError()).toMatchObject({ kind: 'permission-denied' })
     })
 
-    it('markScreenshotsSeen is idempotent and only moves the watermark forward', async () => {
-      await host.markScreenshotsSeen()
-      const first = (await host.getPreferences()).screenshotsSeenWatermark
-      await host.markScreenshotsSeen()
-      const second = (await host.getPreferences()).screenshotsSeenWatermark
-      expect(second).toBeGreaterThanOrEqual(first)
-    })
   })
 
   describe('timer state machine (data-model.md)', () => {
@@ -152,75 +155,23 @@ describe('HostBridge contract — mock implementation', () => {
     })
   })
 
-  describe('playback', () => {
-    it('nulls every field when unavailable and keeps controls inoperable (FR-025)', async () => {
-      for (const state of ['not-running', 'permission-denied'] as const) {
-        host.__mock.setPlaybackAvailability(state)
-        const s = await host.getPlaybackState()
-        expect(s.availability).toBe(state)
-        expect(s.trackName).toBeNull()
-        expect(s.artist).toBeNull()
-        expect(s.positionMs).toBeNull()
-        expect(s.durationMs).toBeNull()
-        await expect(host.togglePlayPause()).rejects.toMatchObject({ code: 'SPOTIFY_UNAVAILABLE' })
-        await expect(host.nextTrack()).rejects.toMatchObject({ code: 'SPOTIFY_UNAVAILABLE' })
-      }
-    })
-
-    it('clamps a seek beyond the track duration', async () => {
-      const before = await host.getPlaybackState()
-      await host.seekTo(before.durationMs! + 999_999)
-      const after = await host.getPlaybackState()
-      expect(after.positionMs).toBeLessThanOrEqual(after.durationMs!)
-    })
-
-    it('clamps a negative seek to zero', async () => {
-      await host.seekTo(-5000)
-      expect((await host.getPlaybackState()).positionMs).toBe(0)
-    })
-
-    it('position never exceeds duration', async () => {
-      const s = await host.getPlaybackState()
-      if (s.positionMs !== null && s.durationMs !== null) {
-        expect(s.positionMs).toBeLessThanOrEqual(s.durationMs)
-      }
-    })
-  })
-
-  describe('notes', () => {
-    it('creates, updates and deletes', async () => {
-      const created = await host.createNote()
-      expect(created.content).toBe('')
-      const updated = await host.updateNote(created.id, 'hello')
-      expect(updated.content).toBe('hello')
-      expect(updated.updatedAt).toBeGreaterThanOrEqual(created.createdAt)
-      await host.deleteNote(created.id)
-      expect((await host.listNotes()).find((n) => n.id === created.id)).toBeUndefined()
-    })
-
-    it('orders notes by updatedAt descending', async () => {
-      const list = await host.listNotes()
-      const times = list.map((n) => n.updatedAt)
-      expect([...times].sort((a, b) => b - a)).toEqual(times)
-    })
-  })
-
   describe('preferences (FR-031)', () => {
-    it('writing one preview flag leaves the other two untouched', async () => {
-      await host.updatePreferences({ previews: { screenshots: true, timer: true, spotify: true } })
+    it('writing one preview flag leaves the other untouched', async () => {
+      await host.updatePreferences({ previews: { screenshots: true, timer: true } })
       const before = await host.getPreferences()
       const after = await host.updatePreferences({
         previews: { ...before.previews, timer: false }
       })
+      // The written flag changes; the unwritten one is preserved (FR-031).
       expect(after.previews.timer).toBe(false)
       expect(after.previews.screenshots).toBe(before.previews.screenshots)
-      expect(after.previews.spotify).toBe(before.previews.spotify)
+      expect(after.previews.screenshots).toBe(true)
     })
 
     it('a partial patch does not blank unrelated settings', async () => {
-      await host.updatePreferences({ lastSection: 'notes', timerDurationMs: 90_000 })
+      await host.updatePreferences({ lastSection: 'timer', timerDurationMs: 90_000 })
       const after = await host.updatePreferences({ previews: { screenshots: true } as never })
-      expect(after.lastSection).toBe('notes')
+      expect(after.lastSection).toBe('timer')
       expect(after.timerDurationMs).toBe(90_000)
     })
 
@@ -230,26 +181,7 @@ describe('HostBridge contract — mock implementation', () => {
     })
   })
 
-  describe('screenshot copy and delete (FR-058)', () => {
-    it('copies a single screenshot as an image and several as file references', async () => {
-      const [first, second] = await host.listScreenshots()
-
-      await host.copyScreenshots([first!.id])
-      expect(host.__mock.lastClipboardMode()).toBe('image')
-
-      await host.copyScreenshots([first!.id, second!.id])
-      expect(host.__mock.lastClipboardMode()).toBe('references')
-    })
-
-    it('skips ids that no longer resolve but succeeds if any do', async () => {
-      const [first] = await host.listScreenshots()
-      await expect(host.copyScreenshots([first!.id, 'gone'])).resolves.toBeUndefined()
-      expect(host.__mock.lastClipboardMode()).toBe('image')
-    })
-
-    it('throws rather than clearing the clipboard when nothing resolves', async () => {
-      await expect(host.copyScreenshots(['gone', 'also-gone'])).rejects.toThrow()
-    })
+  describe('screenshot delete (FR-058)', () => {
 
     it('emits the survivors after a delete', async () => {
       const before = await host.listScreenshots()
@@ -306,76 +238,6 @@ describe('HostBridge contract — mock implementation', () => {
     })
   })
 
-  describe('spotify volume, shuffle and repeat (FR-068 as amended)', () => {
-    it('accepts the ends of the volume range', async () => {
-      await expect(host.setVolume(0)).resolves.toBeUndefined()
-      await expect(host.setVolume(100)).resolves.toBeUndefined()
-      expect((await host.getPlaybackState()).volume).toBe(100)
-    })
-
-    it.each([-1, 101, 50.5, '50' as unknown as number])('rejects volume %s', async (bad) => {
-      await expect(host.setVolume(bad)).rejects.toThrow()
-    })
-
-    it('rejects a non-boolean shuffle or repeat', async () => {
-      await expect(host.setShuffle('yes' as unknown as boolean)).rejects.toThrow()
-      await expect(host.setRepeat(1 as unknown as boolean)).rejects.toThrow()
-    })
-
-    it('round-trips shuffle and repeat through the playback state', async () => {
-      await host.setShuffle(true)
-      await host.setRepeat(true)
-      const state = await host.getPlaybackState()
-      expect(state.shuffling).toBe(true)
-      // A toggle, not a cycle - the boolean is all Spotify exposes (R-109).
-      expect(state.repeating).toBe(true)
-    })
-
-    it('refuses all three when Spotify is unavailable', async () => {
-      host.__mock.setPlaybackAvailability('not-running')
-      await expect(host.setVolume(50)).rejects.toThrow()
-      await expect(host.setShuffle(true)).rejects.toThrow()
-      await expect(host.setRepeat(true)).rejects.toThrow()
-    })
-  })
-
-  describe('playback state nulling (data-model.md)', () => {
-    it.each(['not-running', 'permission-denied'] as const)(
-      'nulls every field when availability is %s',
-      async (availability) => {
-        host.__mock.setPlaybackAvailability(availability)
-        const state = await host.getPlaybackState()
-        // A stale volume or leftover artwork on an unavailable state is the
-        // ghost this rule exists to prevent.
-        expect(state).toMatchObject({
-          trackName: null,
-          artist: null,
-          positionMs: null,
-          durationMs: null,
-          volume: null,
-          shuffling: null,
-          repeating: null,
-          artworkDataUrl: null
-        })
-      }
-    )
-
-    it('carries artwork as a data URL, never an http(s) address', async () => {
-      const state = await host.getPlaybackState()
-      expect(state.artworkDataUrl).toMatch(/^data:/)
-      // The renderer must never receive something it could fetch (R-111).
-      expect(state.artworkDataUrl).not.toMatch(/^https?:/)
-    })
-
-    it('falls back to no artwork without disturbing the rest of the state', async () => {
-      host.__mock.setArtworkMissing(true)
-      const state = await host.getPlaybackState()
-      expect(state.artworkDataUrl).toBeNull()
-      expect(state.trackName).toBeTruthy()
-      expect(state.durationMs).toBeGreaterThan(0)
-    })
-  })
-
   describe('quit (FR-076)', () => {
     it('resolves and records the call rather than exiting', async () => {
       expect(host.__mock.didQuit()).toBe(false)
@@ -388,7 +250,6 @@ describe('HostBridge contract — mock implementation', () => {
     const subs = [
       host.onScreenshotsChanged(() => {}),
       host.onTimerStateChanged(() => {}),
-      host.onPlaybackStateChanged(() => {}),
       host.onPanelShown(() => {})
     ]
     for (const off of subs) {
@@ -429,14 +290,8 @@ describe('HostBridge contract — real implementation wiring', () => {
   it('only ever talks to enumerated invoke channels', async () => {
     await real.listScreenshots()
     await real.openScreenshot('x')
-    await real.markScreenshotsSeen()
     await real.getTimerState()
     await real.startTimer(1000)
-    await real.getPlaybackState()
-    await real.seekTo(5)
-    await real.listNotes()
-    await real.createNote()
-    await real.updateNote('a', 'b')
     await real.getPreferences()
     await real.updatePreferences({})
     await real.setTimerShortcut(null)
@@ -464,12 +319,10 @@ describe('HostBridge contract — real implementation wiring', () => {
     expect(invoke).toHaveBeenCalledWith(INVOKE_CHANNELS.screenshotsStartDrag, { ids: ['a', 'b'] })
   })
 
-  it('brackets a playback subscription with subscribe(true) and subscribe(false)', () => {
-    const off = real.onPlaybackStateChanged(() => {})
-    expect(invoke).toHaveBeenCalledWith(INVOKE_CHANNELS.spotifySubscribe, { active: true })
-    expect(subscribe).toHaveBeenCalledWith(EVENT_CHANNELS.spotifyChanged, expect.any(Function))
-    off()
-    expect(invoke).toHaveBeenCalledWith(INVOKE_CHANNELS.spotifySubscribe, { active: false })
+  it('subscribes to screenshot changes through its enumerated event channel', () => {
+    const off = real.onScreenshotsChanged(() => {})
+    expect(subscribe).toHaveBeenCalledWith(EVENT_CHANNELS.screenshotsChanged, expect.any(Function))
+    expect(() => off()).not.toThrow()
   })
 })
 
@@ -503,5 +356,17 @@ describe('HostBridge contract — structural parity', () => {
 
   it('the declared contract list matches what the implementations actually expose', () => {
     expect(methodsOf(createMockBridge())).toEqual([...CONTRACT_METHODS].sort())
+  })
+
+  it('exposes none of the sixteen methods feature 003 removed', async () => {
+    ;(globalThis as { window?: unknown }).window = {
+      __hostBridge: { invoke: async () => undefined, subscribe: () => () => {} }
+    }
+    const { createElectronBridge } = await import('../../src/renderer/host/host-bridge')
+    for (const impl of [createMockBridge(), createElectronBridge()]) {
+      for (const name of REMOVED_METHODS) {
+        expect(methodsOf(impl), `${name} was re-introduced`).not.toContain(name)
+      }
+    }
   })
 })

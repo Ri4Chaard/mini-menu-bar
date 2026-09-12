@@ -7,8 +7,6 @@
  * incomplete change. See contracts/host-bridge.md.
  */
 import type {
-  Note,
-  PlaybackState,
   Preferences,
   ScreenshotEntry,
   SourceError,
@@ -22,16 +20,16 @@ export interface HostBridge {
   listScreenshots(): Promise<ScreenshotEntry[]>
   openScreenshot(id: string): Promise<void>
   revealScreenshot(id: string): Promise<void>
-  markScreenshotsSeen(): Promise<void>
   onScreenshotsChanged(cb: (entries: ScreenshotEntry[]) => void): Unsubscribe
   getScreenshotSourceError(): Promise<SourceError | null>
-  /** One id copies the image itself; several copy file references (R-107). */
-  copyScreenshots(ids: string[]): Promise<void>
   /** Moves to the Trash, never unlink - deletion stays recoverable (R-108). */
   deleteScreenshots(ids: string[]): Promise<void>
   /**
    * Hand these files to the OS drag session, so they can be dropped into
    * another application as real files.
+   *
+   * Since Copy was removed (FR-096) this is the ONLY route from the panel into
+   * another application, which is why it is retained unchanged (FR-103).
    *
    * The renderer has no paths and must not have any, so it cancels its own
    * HTML5 drag and delegates. Call this from a `dragstart` handler: macOS only
@@ -55,30 +53,6 @@ export interface HostBridge {
    */
   dismissTimerAlarm(): Promise<TimerState>
   onTimerStateChanged(cb: (state: TimerState) => void): Unsubscribe
-
-  // ---- Spotify (FR-021..FR-025) --------------------------------------------
-  getPlaybackState(): Promise<PlaybackState>
-  togglePlayPause(): Promise<void>
-  nextTrack(): Promise<void>
-  previousTrack(): Promise<void>
-  seekTo(positionMs: number): Promise<void>
-  onPlaybackStateChanged(cb: (state: PlaybackState) => void): Unsubscribe
-  /** Integer 0-100. Callers commit on release, not per pointer-move (R-117). */
-  setVolume(volume: number): Promise<void>
-  setShuffle(shuffling: boolean): Promise<void>
-  /**
-   * A toggle, NOT a three-state cycle: Spotify's `repeating` property is a
-   * boolean and the off/all/one cycle in its own UI is not scriptable
-   * (research.md R-109, FR-068 as amended).
-   */
-  setRepeat(repeating: boolean): Promise<void>
-
-  // ---- Notes (FR-026..FR-027) ----------------------------------------------
-  listNotes(): Promise<Note[]>
-  createNote(): Promise<Note>
-  updateNote(id: string, content: string): Promise<Note>
-  deleteNote(id: string): Promise<void>
-  flushNotes(): Promise<void>
 
   // ---- Preferences & previews (FR-006, FR-029..FR-036) ---------------------
   getPreferences(): Promise<Preferences>

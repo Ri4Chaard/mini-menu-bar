@@ -1,11 +1,11 @@
 /**
- * Regression cover for two parsing bugs that both produced silent, intermittent
- * failure rather than a visible error - the kind that quietly come back.
+ * Regression cover for a parsing bug that produced silent, intermittent failure
+ * rather than a visible error - the kind that quietly comes back.
+ *
+ * This file also covered Spotify state parsing until feature 003 removed it.
  */
 import { describe, it, expect } from 'vitest'
 import { parseBackfillLine } from '../../src/main/services/screenshots/spotlight-source'
-import { parseStateOutput } from '../../src/main/services/spotify/playback-service'
-import { FIELD_SEP } from '../../src/main/services/spotify/applescript'
 
 describe('mdfind -attr line parsing', () => {
   it('parses a plain line', () => {
@@ -35,53 +35,5 @@ describe('mdfind -attr line parsing', () => {
     expect(parseBackfillLine('/Users/me/Desktop/shot.png')).toBeNull()
     expect(parseBackfillLine('/a/b.png    kMDItemContentCreationDate = (null)')).toBeNull()
     expect(parseBackfillLine('')).toBeNull()
-  })
-})
-
-describe('Spotify state parsing', () => {
-  const line = (...parts: string[]): string => parts.join(FIELD_SEP)
-
-  it('parses a normal playing state', () => {
-    const { state } = parseStateOutput(line('playing', 'Dying', 'Cold Hart', '209583', '98248'))
-    expect(state).toMatchObject({
-      availability: 'playing',
-      trackName: 'Dying',
-      artist: 'Cold Hart',
-      durationMs: 209583,
-      positionMs: 98248
-    })
-  })
-
-  it('survives a locale that formats decimals with a comma', () => {
-    // AppleScript formats numbers using the user's locale. On a Ukrainian or
-    // German system `player position` comes back as "98,248" - which Number()
-    // reads as NaN, blanking the entire playback state.
-    const { state } = parseStateOutput(line('playing', 'Dying', 'Cold Hart', '209583', '98,248'))
-    expect(state.positionMs).toBe(98)
-    expect(state.trackName).toBe('Dying')
-    expect(state.availability).toBe('playing')
-  })
-
-  it('reports stopped without inventing track data', () => {
-    const { state } = parseStateOutput('stopped')
-    expect(state.availability).toBe('stopped')
-    expect(state.trackName).toBeNull()
-    expect(state.positionMs).toBeNull()
-  })
-
-  it('clamps position to duration', () => {
-    const { state } = parseStateOutput(line('playing', 'X', 'Y', '1000', '99999'))
-    expect(state.positionMs).toBeLessThanOrEqual(state.durationMs!)
-  })
-
-  it('treats a truncated response as stopped rather than throwing', () => {
-    expect(parseStateOutput(line('playing', 'X')).state.availability).toBe('stopped')
-    expect(parseStateOutput('').state.availability).toBe('stopped')
-  })
-
-  it('preserves a track name containing a comma', () => {
-    const { state } = parseStateOutput(line('paused', 'Hello, Goodbye', 'The Beatles', '203000', '1000'))
-    expect(state.trackName).toBe('Hello, Goodbye')
-    expect(state.availability).toBe('paused')
   })
 })

@@ -5,12 +5,11 @@
  *  - Every value crossing the preload boundary is plain JSON. Timestamps are
  *    epoch milliseconds, never Date objects — Date does not survive
  *    structured-clone round-trips predictably across the sandbox.
- *  - Only Note, Preferences and the seen-watermark are durable. ScreenshotEntry
- *    is re-derived from Spotlight each launch; PlaybackState is a read-through
- *    view of another application.
+ *  - Only Preferences is durable. ScreenshotEntry is re-derived from Spotlight
+ *    each launch.
  */
 
-export type SectionId = 'screenshots' | 'timer' | 'spotify' | 'notes'
+export type SectionId = 'screenshots' | 'timer'
 
 /** A read-only reference to a screenshot file. Never persisted. */
 export interface ScreenshotEntry {
@@ -35,8 +34,6 @@ export interface ScreenshotEntry {
    * letting it look like a file that will still be there tomorrow.
    */
   isTemporary: boolean
-  /** Derived at read time from Preferences.screenshotsSeenWatermark. */
-  isSeen: boolean
 }
 
 export type TimerStatus = 'idle' | 'running' | 'paused' | 'finished'
@@ -68,55 +65,9 @@ export interface TimerState {
   alarming: boolean
 }
 
-export interface Note {
-  id: string
-  content: string
-  createdAt: number
-  updatedAt: number
-}
-
-/**
- * Why one enum rather than `isAvailable` plus flags: the reason playback is
- * inoperable changes what the user must be told. 'not-running' means "open
- * Spotify"; 'permission-denied' means "grant automation access". Collapsing
- * them would make the correct message unrenderable (FR-025).
- */
-export type PlaybackAvailability =
-  | 'playing'
-  | 'paused'
-  | 'stopped'
-  | 'not-running'
-  | 'permission-denied'
-
-export interface PlaybackState {
-  availability: PlaybackAvailability
-  trackName: string | null
-  artist: string | null
-  positionMs: number | null
-  durationMs: number | null
-  /** Spotify's `sound volume`: an integer 0-100 (research.md R-109). */
-  volume: number | null
-  shuffling: boolean | null
-  /**
-   * A boolean, NOT the three-state off/all/one cycle Spotify's own UI shows.
-   * Only `repeating` is scriptable, so repeat ships as a toggle (R-109).
-   */
-  repeating: boolean | null
-  /**
-   * A data URL, never the https artwork URL.
-   *
-   * Handing the renderer a URL would let it make the request - an <img src> is
-   * a network call. Main fetches, caches per track, and passes bytes, which is
-   * what keeps the renderer network-free and browser mode working against a
-   * mock placeholder (data-model.md, R-111, FR-087).
-   */
-  artworkDataUrl: string | null
-}
-
 export interface PreviewPreferences {
   screenshots: boolean
   timer: boolean
-  spotify: boolean
 }
 
 export interface Preferences {
@@ -144,8 +95,6 @@ export interface Preferences {
    * stops, and the user has to be the one who chose that.
    */
   timerRepeat: boolean
-  /** Epoch ms. Only ever moves forward. Screenshots at or before this are seen. */
-  screenshotsSeenWatermark: number
 }
 
 export interface SourceError {
@@ -154,17 +103,16 @@ export interface SourceError {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  previews: { screenshots: false, timer: false, spotify: false },
+  previews: { screenshots: false, timer: false },
   lastSection: 'screenshots',
   timerDurationMs: 5 * 60 * 1000,
   timerPresets: [60_000, 300_000, 600_000, 1_500_000],
   timerShortcut: 'Control+Option+T',
   timerAlarm: true,
-  timerRepeat: false,
-  screenshotsSeenWatermark: 0
+  timerRepeat: false
 }
 
-export const SECTION_IDS: readonly SectionId[] = ['screenshots', 'timer', 'spotify', 'notes']
+export const SECTION_IDS: readonly SectionId[] = ['screenshots', 'timer']
 
 /** Spec assumption: a bounded recent window, not a searchable archive. */
 export const MAX_SCREENSHOTS = 50

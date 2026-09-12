@@ -14,8 +14,16 @@ import {
 } from '@shared/types'
 import { normalisePresets } from './normalise-presets'
 
+/**
+ * An unknown value falls back rather than rendering an empty panel.
+ *
+ * This is also the migration path for feature 003: a file written before
+ * Spotify and Notes were removed names a section that no longer exists, and
+ * every such file resolves here rather than needing a version stamp
+ * (research.md R-209). Deliberately not special-cased to those two names — the
+ * general rule already covers them and will cover the next removal too.
+ */
 function reviveSection(value: unknown): SectionId {
-  // An unknown value falls back rather than rendering an empty panel.
   return SECTION_IDS.includes(value as SectionId) ? (value as SectionId) : DEFAULT_PREFERENCES.lastSection
 }
 
@@ -31,10 +39,12 @@ export function revivePreferences(raw: unknown): Preferences {
   const r = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>
   const previews = (typeof r.previews === 'object' && r.previews !== null ? r.previews : {}) as Record<string, unknown>
   return {
+    // Only the surviving keys are read. A stored `previews.spotify` is dropped
+    // by omission rather than deleted explicitly, so it never reaches the
+    // renderer and is not written back (R-209).
     previews: {
       screenshots: reviveBoolean(previews.screenshots, DEFAULT_PREFERENCES.previews.screenshots),
-      timer: reviveBoolean(previews.timer, DEFAULT_PREFERENCES.previews.timer),
-      spotify: reviveBoolean(previews.spotify, DEFAULT_PREFERENCES.previews.spotify)
+      timer: reviveBoolean(previews.timer, DEFAULT_PREFERENCES.previews.timer)
     },
     lastSection: reviveSection(r.lastSection),
     timerDurationMs: Math.max(1, reviveNumber(r.timerDurationMs, DEFAULT_PREFERENCES.timerDurationMs)),
@@ -46,19 +56,18 @@ export function revivePreferences(raw: unknown): Preferences {
         ? (r.timerShortcut as string | null)
         : DEFAULT_PREFERENCES.timerShortcut,
     timerAlarm: reviveBoolean(r.timerAlarm, DEFAULT_PREFERENCES.timerAlarm),
-    timerRepeat: reviveBoolean(r.timerRepeat, DEFAULT_PREFERENCES.timerRepeat),
-    screenshotsSeenWatermark: reviveNumber(r.screenshotsSeenWatermark, 0)
+    timerRepeat: reviveBoolean(r.timerRepeat, DEFAULT_PREFERENCES.timerRepeat)
   }
 }
 
 /**
  * Merge a partial patch into the current preferences.
  *
- * FR-031 requires the three preview flags to be strictly independent: writing
- * one MUST NOT read or alter another. That is why `previews` is merged
- * key-by-key rather than replaced wholesale — a convenient
+ * FR-031 requires the preview flags to be strictly independent: writing one
+ * MUST NOT read or alter another. That is why `previews` is merged key-by-key
+ * rather than replaced wholesale — a convenient
  * `{...current.previews, ...patch.previews}` would still be correct here, but a
- * wholesale assignment would silently blank the other two flags.
+ * wholesale assignment would silently blank the other flag.
  */
 export function mergePreferences(current: Preferences, patch: Partial<Preferences>): Preferences {
   const next: Preferences = {
@@ -66,19 +75,15 @@ export function mergePreferences(current: Preferences, patch: Partial<Preference
     ...patch,
     previews: {
       screenshots: patch.previews?.screenshots ?? current.previews.screenshots,
-      timer: patch.previews?.timer ?? current.previews.timer,
-      spotify: patch.previews?.spotify ?? current.previews.spotify
+      timer: patch.previews?.timer ?? current.previews.timer
     }
   }
   // Presets are normalised on every write, never rejected - a bad list is
   // repaired rather than making preferences unwritable (data-model.md).
   next.timerPresets = normalisePresets(next.timerPresets)
 
-  // The watermark only ever moves forward (data-model.md).
-  next.screenshotsSeenWatermark = Math.max(
-    current.screenshotsSeenWatermark,
-    patch.screenshotsSeenWatermark ?? 0
-  )
+  // Reviving on the way out is what guarantees a removed field can never be
+  // written back, however it arrived in the patch (R-209).
   return revivePreferences(next)
 }
 

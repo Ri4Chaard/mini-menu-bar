@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Camera, Copy, Trash2 } from 'lucide-react'
+import { Camera, Trash2 } from 'lucide-react'
 import type { Preferences, ScreenshotEntry, SourceError } from '@shared/types'
 import { useHost } from '../../host/use-host'
 import { Banner, EmptyState, ErrorState } from '../../components/states'
@@ -33,9 +33,9 @@ export function ScreenshotsSection({
   // state change reformat every chip.
   const now = useMemo(() => Date.now(), [entries])
 
-  // FR-013: opening the section resets the unseen count.
+  // Feature 003 removed the seen/unseen distinction: opening the section no
+  // longer changes what the menu bar badge reports (FR-112, R-203).
   useEffect(() => {
-    void host.markScreenshotsSeen()
     void host.getScreenshotSourceError().then(setSourceError).catch(() => setSourceError(null))
   }, [host])
 
@@ -105,13 +105,6 @@ export function ScreenshotsSection({
         <FooterNote>
           {selected.size > 0 ? `${selected.size} selected` : 'Nothing selected'}
         </FooterNote>
-        <IconButton
-          icon={Copy}
-          label="Copy selected screenshots"
-          tone="fill"
-          disabled={selected.size === 0}
-          onClick={() => void act(() => host.copyScreenshots(ids))}
-        />
         <IconButton
           icon={Trash2}
           label="Delete selected screenshots"

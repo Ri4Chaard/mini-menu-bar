@@ -9,53 +9,29 @@ const base = (over: Partial<Preferences> = {}): Preferences => ({
 })
 
 describe('preference merge — preview independence (FR-031)', () => {
-  it('writing one preview flag leaves the other two byte-identical', () => {
-    const current = base({ previews: { screenshots: true, timer: false, spotify: true } })
+  it('writing one preview flag leaves the other byte-identical', () => {
+    const current = base({ previews: { screenshots: true, timer: false } })
     const next = mergePreferences(current, { previews: { ...current.previews, timer: true } })
 
     expect(next.previews.timer).toBe(true)
     expect(next.previews.screenshots).toBe(current.previews.screenshots)
-    expect(next.previews.spotify).toBe(current.previews.spotify)
   })
 
-  it('a patch naming only one preview key does not blank the others', () => {
-    const current = base({ previews: { screenshots: true, timer: true, spotify: true } })
+  it('a patch naming only one preview key does not blank the other', () => {
+    const current = base({ previews: { screenshots: true, timer: true } })
     // A wholesale `previews` assignment is the bug this guards against.
     const next = mergePreferences(current, { previews: { screenshots: false } as never })
 
     expect(next.previews.screenshots).toBe(false)
     expect(next.previews.timer).toBe(true)
-    expect(next.previews.spotify).toBe(true)
   })
 
   it('leaves unrelated preferences untouched', () => {
-    const current = base({ timerDurationMs: 90_000, lastSection: 'notes' })
-    const next = mergePreferences(current, { previews: { ...current.previews, spotify: true } })
+    const current = base({ timerDurationMs: 90_000, lastSection: 'timer' })
+    const next = mergePreferences(current, { previews: { ...current.previews, screenshots: true } })
 
     expect(next.timerDurationMs).toBe(90_000)
-    expect(next.lastSection).toBe('notes')
-  })
-})
-
-describe('preference merge — watermark (FR-013)', () => {
-  it('moves the watermark forward', () => {
-    const next = mergePreferences(base({ screenshotsSeenWatermark: 100 }), {
-      screenshotsSeenWatermark: 500
-    })
-    expect(next.screenshotsSeenWatermark).toBe(500)
-  })
-
-  it('never moves the watermark backward', () => {
-    const next = mergePreferences(base({ screenshotsSeenWatermark: 500 }), {
-      screenshotsSeenWatermark: 100
-    })
-    expect(next.screenshotsSeenWatermark).toBe(500)
-  })
-
-  it('is idempotent', () => {
-    const once = mergePreferences(base({ screenshotsSeenWatermark: 0 }), { screenshotsSeenWatermark: 300 })
-    const twice = mergePreferences(once, { screenshotsSeenWatermark: 300 })
-    expect(twice).toEqual(once)
+    expect(next.lastSection).toBe('timer')
   })
 })
 
@@ -69,7 +45,7 @@ describe('preference revival', () => {
   })
 
   it('preserves a valid section', () => {
-    expect(revivePreferences({ lastSection: 'spotify' }).lastSection).toBe('spotify')
+    expect(revivePreferences({ lastSection: 'timer' }).lastSection).toBe('timer')
   })
 })
 

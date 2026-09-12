@@ -9,13 +9,7 @@ import { access, constants } from 'node:fs/promises'
 import { shell, type WebContents } from 'electron'
 import { BridgeError } from '@shared/errors'
 import { MAX_SCREENSHOTS, type ScreenshotEntry, type SourceError } from '@shared/types'
-import type { PreferencesService } from '../preferences/preferences-service'
-import {
-  beginScreenshotDrag,
-  copyScreenshotsToClipboard,
-  nothingDeleted,
-  trashScreenshot
-} from './actions'
+import { beginScreenshotDrag, nothingDeleted, trashScreenshot } from './actions'
 import { backfillScreenshots, describe, isScreenshot, type RawScreenshot } from './spotlight-source'
 import { createDirectoryWatcher } from './fs-watcher'
 import {
@@ -31,32 +25,28 @@ export interface ScreenshotService {
   list(): Promise<ScreenshotEntry[]>
   open(id: string): Promise<void>
   reveal(id: string): Promise<void>
-  markSeen(): Promise<void>
-  copy(ids: readonly string[]): Promise<void>
   remove(ids: readonly string[]): Promise<void>
   startDrag(ids: readonly string[], sender: WebContents): Promise<void>
   sourceError(): Promise<SourceError | null>
   latest(): ScreenshotEntry | null
-  unseenCount(): number
+  /** What the menu bar badge reports: every entry currently listed (FR-110). */
+  count(): number
   onChange(cb: (entries: ScreenshotEntry[]) => void): () => void
   start(): Promise<void>
   refreshLocation(): Promise<void>
   stop(): void
 }
 
-export function createScreenshotService(preferences: PreferencesService): ScreenshotService {
+export function createScreenshotService(): ScreenshotService {
   let entries: ScreenshotEntry[] = []
   let error: SourceError | null = null
   const listeners = new Set<(entries: ScreenshotEntry[]) => void>()
 
-  const withSeen = (list: ScreenshotEntry[]): ScreenshotEntry[] => {
-    const watermark = preferences.get().screenshotsSeenWatermark
-    return list.map((e) => ({ ...e, isSeen: e.capturedAt <= watermark }))
-  }
+  const snapshot = (): ScreenshotEntry[] => entries.map((e) => ({ ...e }))
 
   const emit = (): void => {
-    const snapshot = withSeen(entries)
-    for (const cb of listeners) cb(snapshot)
+    const list = snapshot()
+    for (const cb of listeners) cb(list)
   }
 
   const insert = (entry: ScreenshotEntry): void => {
@@ -81,8 +71,7 @@ export function createScreenshotService(preferences: PreferencesService): Screen
       thumbnailDataUrl: thumb.dataUrl,
       width: thumb.width,
       height: thumb.height,
-      isTemporary: raw.isTemporary,
-      isSeen: false
+      isTemporary: raw.isTemporary
     }
   }
 
@@ -165,7 +154,7 @@ export function createScreenshotService(preferences: PreferencesService): Screen
   return {
     async list() {
       if (error) throw new BridgeError('PERMISSION_DENIED', error.message)
-      return withSeen(entries)
+      return snapshot()
     },
 
     async open(id) {
@@ -177,35 +166,6 @@ export function createScreenshotService(preferences: PreferencesService): Screen
     async reveal(id) {
       const entry = await requireExisting(id)
       shell.showItemInFolder(entry.path)
-    },
-
-    async markSeen() {
-      await preferences.update({ screenshotsSeenWatermark: Date.now() })
-      emit()
-    },
-
-    /**
-     * The renderer sends ids; this resolves them against `entries`, which main
-     * owns. A renderer-supplied path is never accepted (constitution,
-     * Security) - that is the whole reason copy takes ids at all.
-     *
-     * Partial resolution is not a failure: copying 3 of 4 succeeds. Resolving
-     * none of them is, because otherwise the user gets a silently cleared
-     * pasteboard (contracts/host-bridge.md).
-     */
-    async copy(ids) {
-      const paths: string[] = []
-      for (const id of ids) {
-        const entry = entries.find((e) => e.id === id)
-        if (!entry) continue
-        try {
-          await access(entry.path, constants.R_OK)
-          paths.push(entry.path)
-        } catch {
-          drop(id)
-        }
-      }
-      copyScreenshotsToClipboard(paths)
     },
 
     /**
@@ -258,9 +218,11 @@ export function createScreenshotService(preferences: PreferencesService): Screen
       return error
     },
 
-    latest: () => withSeen(entries)[0] ?? null,
+    latest: () => snapshot()[0] ?? null,
 
-    unseenCount: () => withSeen(entries).filter((e) => !e.isSeen).length,
+    // The total, not an unseen subset: viewing no longer changes what the menu
+    // bar reports (FR-110, FR-112, research.md R-203).
+    count: () => entries.length,
 
     onChange(cb) {
       listeners.add(cb)

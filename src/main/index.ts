@@ -14,8 +14,6 @@ import { createPanelController } from './window/panel-window'
 import { createPreferencesService } from './services/preferences/preferences-service'
 import { createScreenshotService } from './services/screenshots/screenshot-store'
 import { createTimerService } from './services/timer/timer-service'
-import { createPlaybackService } from './services/spotify/playback-service'
-import { createNotesService } from './services/notes/notes-service'
 import { createNotificationService } from './services/notifications/notification-service'
 import { createShortcutService } from './services/shortcuts/shortcut-service'
 import { createTrayController } from './tray/tray-controller'
@@ -87,9 +85,7 @@ async function bootstrap(): Promise<void> {
 
     // ---- Services -------------------------------------------------------
     const notifications = createNotificationService()
-    const screenshots = createScreenshotService(preferences)
-    const notes = createNotesService()
-    const playback = createPlaybackService()
+    const screenshots = createScreenshotService()
     const timer = createTimerService({
       now: () => Date.now(),
       // Both read at the moment of finishing rather than captured here, so
@@ -120,13 +116,7 @@ async function bootstrap(): Promise<void> {
       send(EVENT_CHANNELS.timerChanged, state)
       tray.setTimer(state)
     })
-    playback.onChange((state) => {
-      send(EVENT_CHANNELS.spotifyChanged, state)
-      tray.setPlayback(state)
-    })
-    preferences.onChange((prefs) => {
-      // The Spotify preview needs polling even with no renderer subscription.
-      playback.setPreviewActive(prefs.previews.spotify)
+    preferences.onChange(() => {
       void tray.refresh()
     })
 
@@ -137,11 +127,9 @@ async function bootstrap(): Promise<void> {
       void screenshots.refreshLocation()
     })
 
-    registerIpcHandlers({ preferences, panel, screenshots, timer, playback, notes, shortcuts } satisfies AppServices)
+    registerIpcHandlers({ preferences, panel, screenshots, timer, shortcuts } satisfies AppServices)
 
-    await notes.load()
     await shortcuts.apply()
-    playback.setPreviewActive(preferences.get().previews.spotify)
     await screenshots.start()
     await tray.refresh()
 
@@ -149,7 +137,6 @@ async function bootstrap(): Promise<void> {
       shortcuts.dispose()
       screenshots.stop()
       timer.stop()
-      playback.stop()
       tray.dispose()
     })
   })

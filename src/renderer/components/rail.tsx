@@ -18,11 +18,12 @@ export type ActiveSection = SectionDefinition['id']
 export function Rail({
   active,
   onSelect,
-  unseenCount
+  screenshotCount
 }: {
   active: ActiveSection
   onSelect: (id: ActiveSection) => void
-  unseenCount: number
+  /** Total screenshots listed. The seen/unseen split was removed (FR-112). */
+  screenshotCount: number
 }): ReactNode {
   const items = [...SECTIONS, SETTINGS_SECTION]
   const buttons = useRef<(HTMLButtonElement | null)[]>([])
@@ -55,7 +56,7 @@ export function Rail({
       {items.map((section, index) => {
         const Icon = section.icon
         const isActive = section.id === active
-        const showBadge = section.id === 'screenshots' && unseenCount > 0
+        const showBadge = section.id === 'screenshots' && screenshotCount > 0
 
         return (
           <button
@@ -82,7 +83,7 @@ export function Rail({
             <Icon style={{ width: 'var(--rail-icon)', height: 'var(--rail-icon)' }} aria-hidden />
             {showBadge ? (
               <span
-                aria-label={`${unseenCount} new`}
+                aria-label={`${screenshotCount} screenshots`}
                 className="absolute top-1 right-1 size-2 rounded-full bg-[var(--color-accent)]"
               />
             ) : null}
