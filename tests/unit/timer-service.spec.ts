@@ -254,14 +254,44 @@ describe('the finish alarm', () => {
     expect(h.silence).not.toHaveBeenCalled()
   })
 
-  it('is silenced by dismissAlarm without disturbing the countdown state', () => {
+  it('is silenced by dismissAlarm, which also clears the countdown', () => {
+    // Dismiss used to leave the timer sitting at 0:00 in 'finished', so using
+    // it again meant pressing Reset first. It now returns to the configured
+    // duration, ready to start.
     const h = harness()
     h.service.start(60_000)
     h.advance(60_000)
     const after = h.service.dismissAlarm()
     expect(after.alarming).toBe(false)
-    expect(after.status).toBe('finished')
+    expect(after.status).toBe('idle')
+    expect(after.remainingMs).toBe(60_000)
+    expect(after.configuredDurationMs).toBe(60_000)
     expect(h.silence).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves the dismissed timer startable without a separate reset', () => {
+    const h = harness()
+    h.service.start(60_000)
+    h.advance(60_000)
+    h.service.dismissAlarm()
+
+    const started = h.service.start(h.service.get().configuredDurationMs)
+    expect(started.status).toBe('running')
+    expect(started.remainingMs).toBe(60_000)
+  })
+
+  it('does not re-alarm after dismissing, having cleared the notified latch', () => {
+    const h = harness()
+    h.service.start(60_000)
+    h.advance(60_000)
+    h.service.dismissAlarm()
+    h.notify.mockClear()
+
+    // A fresh countdown must be able to announce its own finish.
+    h.service.start(30_000)
+    h.advance(30_000)
+    expect(h.service.get().alarming).toBe(true)
+    expect(h.notify).toHaveBeenCalledTimes(1)
   })
 
   it('treats dismissing nothing as a no-op rather than an error', () => {
@@ -300,6 +330,12 @@ describe('the finish alarm', () => {
     expect(h.silence).not.toHaveBeenCalled()
   })
 
+  /**
+   * The exception to "Dismiss resets". With repeat on, finish() has already
+   * started the next cycle by the time the user reaches for Dismiss, so
+   * resetting would destroy it - turning "repeat until stopped" into "run
+   * exactly twice".
+   */
   it('leaves a repeated countdown running when the alarm is dismissed', () => {
     const h = harness(1_000_000, () => true)
     h.service.start(60_000)
@@ -308,6 +344,19 @@ describe('the finish alarm', () => {
     const after = h.service.dismissAlarm()
     expect(after.alarming).toBe(false)
     expect(after.status).toBe('running')
+  })
+
+  it('does not shorten the repeated countdown it declines to reset', () => {
+    const h = harness(1_000_000, () => true)
+    h.service.start(60_000)
+    h.advance(60_000)
+    h.service.get()
+    h.advance(10_000)
+
+    const after = h.service.dismissAlarm()
+    expect(after.status).toBe('running')
+    // Still counting down the repeat that was already in flight, not restarted.
+    expect(after.remainingMs).toBe(50_000)
   })
 
   it('silences the alarm when the service is torn down', () => {

@@ -215,6 +215,24 @@ export function createTimerService(deps: TimerDeps): TimerService {
       reconcile()
       if (!alarming) return snapshot()
       silence()
+
+      // Dismiss also clears the countdown back to its configured duration, so
+      // the timer is ready to run again instead of sitting at 0:00 needing a
+      // separate Reset.
+      //
+      // NOT while a countdown is running, which with repeat on is the normal
+      // case: finish() has already begun the next cycle by the time the user
+      // reaches for Dismiss, and resetting here would destroy it - turning
+      // "repeat until stopped" into "run exactly twice". Silencing is the whole
+      // of what Dismiss means in that state.
+      if (status !== 'running') {
+        status = 'idle'
+        deadlineAt = null
+        frozenRemainingMs = configuredDurationMs
+        notified = false
+        clearTimers()
+      }
+
       emit()
       return snapshot()
     },

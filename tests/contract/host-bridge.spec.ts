@@ -215,6 +215,17 @@ describe('HostBridge contract — mock implementation', () => {
       expect(state.alarming).toBe(false)
       expect(state.status).toBe('idle')
     })
+
+    it('clears the countdown so the timer is startable again', async () => {
+      await host.startTimer(1000)
+      await new Promise((r) => setTimeout(r, 1100))
+
+      const dismissed = await host.dismissTimerAlarm()
+      expect(dismissed.alarming).toBe(false)
+      // Not left sitting at 0:00 in 'finished' needing a separate Reset.
+      expect(dismissed.status).toBe('idle')
+      expect(dismissed.remainingMs).toBe(dismissed.configuredDurationMs)
+    })
   })
 
   describe('dragging screenshots out', () => {

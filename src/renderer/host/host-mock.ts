@@ -143,6 +143,21 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
     for (const cb of timerListeners) cb(state)
   }
 
+  /**
+   * Settle a deadline that has already passed.
+   *
+   * The host reconciles on demand inside get() and dismissAlarm(), so a timer
+   * that expired while nothing was observing is already 'finished' by the time
+   * it is asked about. Without the same step here the mock only ever settles
+   * while a subscriber keeps it ticking, and browser mode would disagree with
+   * the host about whether the alarm is ringing (Principle I).
+   */
+  const reconcileTimer = (): void => {
+    if (timer.status !== 'running' || timer.deadlineAt === null) return
+    if (Date.now() < timer.deadlineAt) return
+    emitTimer()
+  }
+
   function startTicking(): void {
     // Demand-driven: no interval unless someone is watching (Principle V).
     if (tickHandle !== null || timerListeners.size === 0) return
@@ -214,13 +229,29 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
     },
 
     async getTimerState() {
+      reconcileTimer()
       return projectTimer()
     },
     async dismissTimerAlarm() {
-      if (timer.alarming) {
-        timer = { ...timer, alarming: false }
-        emitTimer()
-      }
+      reconcileTimer()
+      if (!timer.alarming) return projectTimer()
+
+      // Mirrors the host: dismissing silences AND clears the countdown back to
+      // its configured duration, so the timer is ready to start again - except
+      // while a repeat cycle is already running, where resetting would destroy
+      // the countdown the user can see ticking.
+      timer =
+        timer.status === 'running'
+          ? { ...timer, alarming: false }
+          : {
+              ...timer,
+              alarming: false,
+              status: 'idle',
+              deadlineAt: null,
+              remainingMs: timer.configuredDurationMs
+            }
+      stopTicking()
+      emitTimer()
       return projectTimer()
     },
     async startTimer(durationMs) {
