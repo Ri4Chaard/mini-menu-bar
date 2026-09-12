@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
+  badgeScale,
   badgeText,
   composeBadge,
   digitGlyph,
@@ -88,8 +89,8 @@ describe('composeBadge', () => {
     const after = Buffer.from(before)
     composeBadge(after, W, H, 7)
 
-    // The badge is at most this tall; everything below it must be untouched.
-    const maxBoxH = GLYPH_H + 4
+    // The badge is exactly this tall; everything below it must be untouched.
+    const maxBoxH = (GLYPH_H + 2) * badgeScale(H)
     for (let y = maxBoxH; y < H; y++) {
       for (let x = 0; x < W; x++) {
         expect(pixel(after, W, x, y), `row ${y} was touched`).toEqual(pixel(before, W, x, y))
@@ -110,7 +111,7 @@ describe('composeBadge', () => {
     const litColumns = (buf: Buffer): number => {
       let n = 0
       for (let x = 0; x < W; x++) {
-        for (let y = 0; y < GLYPH_H + 4; y++) {
+        for (let y = 0; y < (GLYPH_H + 2) * badgeScale(H); y++) {
           if (pixel(buf, W, x, y)[3] === 0xff && pixel(buf, W, x, y)[0] !== 0x80) {
             n++
             break
@@ -163,5 +164,46 @@ describe('composeBadge', () => {
     composeBadge(a, W, H, 23)
     composeBadge(b, W, H, 23)
     expect(a.equals(b)).toBe(true)
+  })
+})
+
+/**
+ * The reported bug: at one buffer pixel per font pixel the digits were 5 px
+ * tall on a 36 px canvas — roughly 2.5 logical points, and unreadable in the
+ * menu bar. Each font pixel is now a scale x scale block.
+ */
+describe('badgeScale', () => {
+  it('makes the digits a usable fraction of the image height', () => {
+    for (const h of [24, 36, 50]) {
+      const glyphHeight = GLYPH_H * badgeScale(h)
+      expect(glyphHeight / h).toBeGreaterThan(0.3)
+    }
+  })
+
+  it('never lets the badge swallow the thumbnail', () => {
+    for (const h of [12, 18, 24, 36, 50, 100]) {
+      const boxHeight = (GLYPH_H + 2) * badgeScale(h)
+      expect(boxHeight).toBeLessThanOrEqual(h)
+    }
+  })
+
+  it('grows with the canvas', () => {
+    expect(badgeScale(36)).toBeGreaterThan(badgeScale(18))
+    expect(badgeScale(72)).toBeGreaterThanOrEqual(badgeScale(36))
+  })
+
+  it('never drops below one, however small the canvas', () => {
+    for (const h of [0, 1, 4, 7, -5, NaN]) expect(badgeScale(h)).toBeGreaterThanOrEqual(1)
+  })
+
+  it('draws visibly more ink at the larger scale', () => {
+    const ink = (h: number): number => {
+      const buf = Buffer.alloc(W * h * BPP, 0x80)
+      composeBadge(buf, W, h, 8)
+      let n = 0
+      for (let i = 0; i < buf.length; i += BPP) if (buf[i] !== 0x80) n++
+      return n
+    }
+    expect(ink(36)).toBeGreaterThan(ink(18) * 2)
   })
 })

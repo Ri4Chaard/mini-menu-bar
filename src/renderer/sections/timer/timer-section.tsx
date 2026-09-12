@@ -166,7 +166,9 @@ export function TimerSection({
       footer={footer}
     >
       <div className="flex h-full items-center justify-between gap-4">
-        <div className="flex flex-col gap-1.5">
+        {/* shrink-0 on the left column: the readout and status line are fixed
+            content, so the preset row is what must give way if anything does. */}
+        <div className="flex shrink-0 flex-col gap-1.5">
           <DurationInput
             displayMs={idle && pendingMs !== null ? pendingMs : state.remainingMs}
             configuredMs={pendingMs ?? state.configuredDurationMs}
@@ -197,7 +199,7 @@ export function TimerSection({
           </span>
         </div>
 
-        <div className="flex flex-col items-end gap-3">
+        <div className="flex min-w-0 flex-col items-end gap-3">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -219,7 +221,11 @@ export function TimerSection({
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* The row cannot wrap (the body band is a fixed 108 pt), so it is
+              capped at MAX_TIMER_PRESETS and clipped as a backstop. Without the
+              clip an over-long label pushes the last chip past the panel edge,
+              which is what a six-preset row used to do. */}
+          <div className="flex min-w-0 items-center gap-2 overflow-hidden">
             {presets.map((ms) => (
               <Chip
                 key={ms}

@@ -10,6 +10,13 @@ import { formatDurationInput, parseDuration } from './parse-duration'
  * tests/unit/design-tokens.spec.ts — and an extra row would break it. Display
  * and editor share the same 108 pt band (research.md R-208).
  *
+ * Both states are laid out on ONE fixed-width grid cell, and the button and the
+ * input carry identical type metrics and zero padding. Anything else makes the
+ * panel visibly jump the moment the field opens: the readout is the widest
+ * thing in the left column, so a few pixels of difference shoves the transport
+ * buttons and the whole preset row sideways, and at six presets the last chip
+ * falls off the panel entirely.
+ *
  * Escape is the delicate part. PanelShell dismisses the panel on Escape via a
  * bubble-phase listener on the panel root, and a text field has to be able to
  * cancel an edit without the panel vanishing underneath it. The rule is two
@@ -66,13 +73,19 @@ export function DurationInput({
     onCommit(ms)
   }
 
+  // Identical on both, so swapping one for the other moves nothing. `w-[6ch]`
+  // with tabular numerals holds the longest clock this readout shows,
+  // "1:02:05", without reflowing for shorter ones.
+  const metrics =
+    'block m-0 w-[6ch] border-0 p-0 bg-transparent text-left text-[length:var(--text-display)] leading-[1.05] font-semibold tabular-nums'
+
   if (!editing) {
     return (
       <button
         type="button"
         onClick={begin}
         aria-label={`Countdown ${formatClock(displayMs)}. Click to type a duration.`}
-        className="block text-left text-[length:var(--text-display)] leading-[1.05] font-semibold tabular-nums text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+        className={`${metrics} text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]`}
       >
         <span aria-live="polite" data-status={status}>
           {formatClock(displayMs)}
@@ -108,7 +121,7 @@ export function DurationInput({
           cancel()
         }
       }}
-      className={`block w-[7ch] bg-transparent text-left text-[length:var(--text-display)] leading-[1.05] font-semibold tabular-nums outline-none ${
+      className={`${metrics} outline-none ${
         rejected
           ? 'text-[var(--color-danger)] underline decoration-wavy'
           : 'text-[var(--color-text)]'

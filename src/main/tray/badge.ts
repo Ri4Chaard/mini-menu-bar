@@ -39,11 +39,33 @@ const PLUS: readonly number[] = [0b000, 0b010, 0b111, 0b010, 0b000]
 
 export const GLYPH_W = 3
 export const GLYPH_H = 5
-/** Blank column between glyphs. */
-const TRACKING = 1
-/** Pill padding around the glyph run. */
-const PAD_X = 2
-const PAD_Y = 2
+
+/**
+ * How tall the digits should be as a fraction of the image.
+ *
+ * The first version drew the font at one buffer pixel per font pixel, which on
+ * a 36 px canvas made the digits 5 px tall - about 2.5 logical points, and
+ * unreadable in the menu bar. Each font pixel is now drawn as a `scale` x
+ * `scale` block instead, chosen from the canvas height.
+ */
+const GLYPH_HEIGHT_FRACTION = 0.45
+/** The badge must not swallow the thumbnail it sits on. */
+const MAX_BOX_FRACTION = 0.66
+
+/**
+ * Pixels per font pixel for a given canvas height.
+ *
+ * Exported so the sizing rule is testable directly rather than only through
+ * rendered output.
+ */
+export function badgeScale(height: number): number {
+  if (!Number.isFinite(height) || height <= 0) return 1
+
+  let scale = Math.max(1, Math.round((height * GLYPH_HEIGHT_FRACTION) / GLYPH_H))
+  // Padding is one font pixel each side, so the box is GLYPH_H + 2 blocks tall.
+  while (scale > 1 && (GLYPH_H + 2) * scale > height * MAX_BOX_FRACTION) scale -= 1
+  return scale
+}
 
 /**
  * Badge colours.
@@ -86,9 +108,12 @@ export function composeBadge(
   if (bitmap.length !== width * height * BPP) return
 
   const text = badgeText(count)
-  const runW = text.length * GLYPH_W + (text.length - 1) * TRACKING
-  const boxW = runW + PAD_X * 2
-  const boxH = GLYPH_H + PAD_Y * 2
+  const scale = badgeScale(height)
+  // Tracking and padding are one font pixel each, scaled with the glyphs, so
+  // the badge keeps its proportions at every size.
+  const runW = (text.length * GLYPH_W + (text.length - 1)) * scale
+  const boxW = runW + 2 * scale
+  const boxH = (GLYPH_H + 2) * scale
 
   // Never a partial or clipped glyph: if it does not fit, nothing is drawn.
   if (boxW > width || boxH > height) return
@@ -100,19 +125,23 @@ export function composeBadge(
     for (let x = boxX; x < boxX + boxW; x++) put(bitmap, width, x, y, PILL)
   }
 
-  let penX = boxX + PAD_X
+  let penX = boxX + scale
   for (const char of text) {
     const glyph = char === '+' ? PLUS : digitGlyph(Number(char))
     for (let row = 0; row < GLYPH_H; row++) {
       const bits = glyph[row]!
       for (let col = 0; col < GLYPH_W; col++) {
         // Bit 2 is the leftmost column of the 3-wide glyph.
-        if ((bits >> (GLYPH_W - 1 - col)) & 1) {
-          put(bitmap, width, penX + col, boxY + PAD_Y + row, INK)
+        if (!((bits >> (GLYPH_W - 1 - col)) & 1)) continue
+        // One font pixel becomes a scale x scale block.
+        for (let dy = 0; dy < scale; dy++) {
+          for (let dx = 0; dx < scale; dx++) {
+            put(bitmap, width, penX + col * scale + dx, boxY + scale + row * scale + dy, INK)
+          }
         }
       }
     }
-    penX += GLYPH_W + TRACKING
+    penX += (GLYPH_W + 1) * scale
   }
 }
 
