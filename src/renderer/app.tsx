@@ -28,6 +28,24 @@ export function App(): ReactNode {
     }
   }, [host])
 
+  /**
+   * Bring the Timer section forward when the alarm starts.
+   *
+   * Main opens the panel when the countdown finishes, but it cannot choose the
+   * section - that is renderer state. Without this the panel would appear on
+   * whatever was last open, leaving Dismiss one click away at the moment it is
+   * most wanted.
+   *
+   * This costs nothing at idle: onTimerStateChanged only attaches an event
+   * listener, unlike a subscription that asks main to start emitting, so the
+   * Principle V "no periodic work when nothing is running" budget is untouched.
+   */
+  useEffect(() => {
+    return host.onTimerStateChanged((state) => {
+      if (state.alarming) setActive('timer')
+    })
+  }, [host])
+
   // The rail's count badge is needed regardless of which section is open, so
   // the collection is owned here rather than inside the section.
   useEffect(() => {

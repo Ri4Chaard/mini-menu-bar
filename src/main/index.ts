@@ -90,7 +90,16 @@ async function bootstrap(): Promise<void> {
       now: () => Date.now(),
       // Both read at the moment of finishing rather than captured here, so
       // toggling the bell or repeat affects the countdown already running.
-      notify: () => notifications.timerFinished({ alarm: preferences.get().timerAlarm }),
+      notify: () => {
+        // Open the panel as well as posting the notification. A macOS
+        // notification can be suppressed entirely - Do Not Disturb, a Focus
+        // mode, or notification permission never granted - and a timer whose
+        // only announcement is suppressible is a timer that silently fails.
+        // The panel is ours to show, so it always appears, and it carries the
+        // Dismiss control the alarm needs.
+        panel.show()
+        return notifications.timerFinished({ alarm: preferences.get().timerAlarm })
+      },
       silence: () => notifications.stopAlarm(),
       repeat: () => preferences.get().timerRepeat
     })

@@ -120,8 +120,14 @@ export const MAX_SCREENSHOTS = 50
 /**
  * Layout constraint, not taste: the presets row is 237 pt wide inside a body
  * band of fixed height, so it cannot wrap (data-model.md, R-105).
+ *
+ * Lowered from 8 to 5 once durations became typed rather than generated. A
+ * worst-case label is now "1h 30m" at roughly 48 pt, and five of those plus
+ * their gaps is already at the edge of the row - eight never actually fitted,
+ * it was simply unreachable while presets could only be added one round number
+ * at a time.
  */
-export const MAX_TIMER_PRESETS = 8
+export const MAX_TIMER_PRESETS = 5
 
 export const MIN_TIMER_PRESET_MS = 1_000
 export const MAX_TIMER_PRESET_MS = 24 * 60 * 60 * 1000

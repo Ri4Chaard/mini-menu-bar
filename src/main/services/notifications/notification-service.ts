@@ -14,23 +14,61 @@
  * the user happens to be looking.
  */
 import { execFile, type ChildProcess } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { Notification } from 'electron'
 
 /**
- * macOS does not ship the Clock app's own timer tone as a playable asset - it
- * is not in /System/Library/Sounds, Clock.app's Resources, ClockUIFramework or
- * /System/Library/Audio/UISounds. This is the nearest system alert sound with
- * an alarm's character, and it is present on every macOS install.
+ * Candidate alarm sounds, most wanted first.
+ *
+ * The request was for something like Apple's "Radius". Radius is not available:
+ * it was an iOS 7 alert tone that Apple has since retired, and it is present
+ * nowhere on macOS. What macOS DOES carry is the rest of that same iOS 7 alert
+ * family, in ToneLibrary - so the nearest thing to Radius is one of its actual
+ * siblings rather than an imitation. Circles is the closest in character: soft,
+ * warm, gently ascending, and 2.4 s, which suits a tone that repeats with a gap
+ * rather than one that startles.
+ *
+ * ToneLibrary is a PRIVATE framework, so these paths are not contractual and
+ * can move or vanish in a macOS update. That is the whole reason this is a
+ * chain ending in /System/Library/Sounds, which is public and present on every
+ * install: an alarm that silently fails to ring is far worse than one that
+ * rings with the wrong timbre.
  */
-export const ALARM_SOUND_PATH = '/System/Library/Sounds/Submarine.aiff'
+const TONE_LIBRARY = '/System/Library/PrivateFrameworks/ToneLibrary.framework/Resources/AlertTones/Modern'
+
+export const ALARM_SOUND_CANDIDATES: readonly string[] = [
+  `${TONE_LIBRARY}/Circles.m4r`,
+  `${TONE_LIBRARY}/Aurora.m4r`,
+  `${TONE_LIBRARY}/Chord.m4r`,
+  // Public, guaranteed, and what this app used before: the floor of the chain.
+  '/System/Library/Sounds/Submarine.aiff'
+]
+
+/**
+ * The first candidate that actually exists.
+ *
+ * Pure apart from the filesystem probe, and exported so the resolution order is
+ * testable without playing anything (constitution Principle IV).
+ */
+export function resolveAlarmSound(
+  candidates: readonly string[] = ALARM_SOUND_CANDIDATES,
+  exists: (path: string) => boolean = existsSync
+): string {
+  return candidates.find(exists) ?? candidates[candidates.length - 1]!
+}
+
+export const ALARM_SOUND_PATH = resolveAlarmSound()
 
 /**
  * afplay's volume is a multiplier on the file, not a system volume, so this
  * makes the alarm carry without touching what the user has set for everything
  * else. The system sounds are mastered quietly for notification use; at 1.0
  * this one is easy to miss from the next room.
+ *
+ * Lower than the old value of 4: the alert tones are mastered louder than the
+ * /System/Library/Sounds set, and a soft tone played at 4x stops being soft.
  */
-export const ALARM_VOLUME = '4'
+export const ALARM_VOLUME = '2.5'
 
 /** Silence between rings, so it reads as an alarm rather than a stuck file. */
 export const ALARM_GAP_MS = 900

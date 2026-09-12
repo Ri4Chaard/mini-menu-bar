@@ -39,7 +39,13 @@ vi.mock('node:child_process', () => ({
   execFile: (command: string, args: string[], onExit: () => void) => execFile(command, args, onExit)
 }))
 
-const { createNotificationService, ALARM_SOUND_PATH, ALARM_VOLUME } = await import(
+const {
+  createNotificationService,
+  ALARM_SOUND_PATH,
+  ALARM_SOUND_CANDIDATES,
+  ALARM_VOLUME,
+  resolveAlarmSound
+} = await import(
   '../../src/main/services/notifications/notification-service'
 )
 
@@ -164,5 +170,32 @@ describe('the alarm sound', () => {
     // A missing file would fail silently: afplay exits non-zero, the chain
     // continues, and the timer ends in total silence with nothing to show why.
     expect(existsSync(ALARM_SOUND_PATH)).toBe(true)
+  })
+
+  it('prefers the first candidate that exists', () => {
+    const exists = (p: string): boolean => p === ALARM_SOUND_CANDIDATES[1]
+    expect(resolveAlarmSound(ALARM_SOUND_CANDIDATES, exists)).toBe(ALARM_SOUND_CANDIDATES[1])
+  })
+
+  /**
+   * The whole reason this is a chain. ToneLibrary is a PRIVATE framework, so
+   * those paths can move or vanish in a macOS update; the last candidate is in
+   * public /System/Library/Sounds and is the floor.
+   */
+  it('falls back to the public system sound when no candidate exists', () => {
+    const last = ALARM_SOUND_CANDIDATES[ALARM_SOUND_CANDIDATES.length - 1]!
+    expect(resolveAlarmSound(ALARM_SOUND_CANDIDATES, () => false)).toBe(last)
+    expect(last.startsWith('/System/Library/Sounds/')).toBe(true)
+  })
+
+  it.runIf(platform === 'darwin')('the floor of the chain is always present', () => {
+    const last = ALARM_SOUND_CANDIDATES[ALARM_SOUND_CANDIDATES.length - 1]!
+    expect(existsSync(last)).toBe(true)
+  })
+
+  it('is played quietly enough that a soft tone stays soft', () => {
+    // Raised volume is a multiplier on the file. The alert tones are mastered
+    // louder than /System/Library/Sounds, so the old 4x made them harsh.
+    expect(Number(ALARM_VOLUME)).toBeLessThanOrEqual(3)
   })
 })

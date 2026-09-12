@@ -9,12 +9,24 @@ import { Chip } from '../../components/ui/chip'
 import { IconButton } from '../../components/ui/icon-button'
 
 
-const MINUTE = 60_000
 
-/** "5m", "25m", "1h 30m" — the chip label for a duration. */
+/**
+ * "10s", "90s", "5m", "1m 30s", "1h 30m" — the chip label for a duration.
+ *
+ * Seconds are spelled out rather than rounded away. Rounding to the nearest
+ * minute turned a typed 0:10 into a chip reading "0m", which names a timer that
+ * cannot exist - the minimum is 1 s.
+ */
 export function presetLabel(ms: number): string {
-  const minutes = Math.round(ms / MINUTE)
-  if (minutes < 60) return `${minutes}m`
+  const totalSeconds = Math.round(ms / 1000)
+
+  if (totalSeconds < 60) return `${totalSeconds}s`
+
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+
+  if (minutes < 60) return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`
+
   const hours = Math.floor(minutes / 60)
   const rest = minutes % 60
   return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`
@@ -67,6 +79,26 @@ export function TimerSection({
 
   const running = state.status === 'running'
   const idle = state.status === 'idle'
+
+  /** The duration the Save control would store: what is typed, else configured. */
+  const currentMs = pendingMs ?? state.configuredDurationMs
+  const alreadySaved = presets.includes(currentMs)
+  const rowFull = presets.length >= MAX_TIMER_PRESETS
+  const canSave = !alreadySaved && !rowFull
+
+  const saveLabel = alreadySaved ? 'Saved' : rowFull ? `Max ${MAX_TIMER_PRESETS}` : 'Save'
+
+  /**
+   * Add the current duration to the quick-pick row.
+   *
+   * Explicit because a duration typed for a one-off timer should not become a
+   * permanent chip on its own. normalisePresets sorts, de-duplicates and caps
+   * the result, so this cannot produce a duplicate or overflow the row.
+   */
+  const saveCurrent = (): void => {
+    if (!canSave) return
+    onUpdatePreferences({ timerPresets: [...presets, currentMs] })
+  }
   // Dismiss REPLACES the transport action rather than joining the row. The
   // body band is a fixed 108 pt and the button row already fills its width, so
   // a third button would push the presets out of the panel - and while an
@@ -116,10 +148,20 @@ export function TimerSection({
       title="Timer"
       pill={state.alarming ? 'Alarm' : state.status === 'idle' ? 'Focus' : state.status}
       action={
-        <HeaderAction
-          label={editing ? 'Done' : 'Edit Presets'}
-          onClick={() => setEditing((v) => !v)}
-        />
+        editing ? (
+          <HeaderAction label="Done" onClick={() => setEditing(false)} />
+        ) : (
+          <div style={{ gap: 'var(--header-gap-right)' }} className="flex items-center">
+            <HeaderAction
+              label={saveLabel}
+              // Disabled rather than hidden, so the row's cap is discoverable
+              // before the user hits it rather than at the moment it silently
+              // stops working.
+              onClick={canSave ? saveCurrent : undefined}
+            />
+            <HeaderAction label="Edit" onClick={() => setEditing(true)} />
+          </div>
+        )
       }
       footer={footer}
     >
@@ -129,16 +171,13 @@ export function TimerSection({
             displayMs={idle && pendingMs !== null ? pendingMs : state.remainingMs}
             configuredMs={pendingMs ?? state.configuredDurationMs}
             status={state.status}
+            // Committing a typed duration sets what Start will use. It does
+            // NOT touch the preset row - a duration typed once for a one-off
+            // timer should not silently become a permanent chip. Saving is a
+            // separate, explicit act (see the Save control below).
             onCommit={(ms) => {
               setPendingMs(ms)
-              onUpdatePreferences({
-                timerDurationMs: ms,
-                // A typed duration joins the quick-pick row. normalisePresets
-                // sorts, de-duplicates and caps it, so a repeat of an existing
-                // value is a no-op rather than a duplicate chip.
-                timerPresets:
-                  presets.length < MAX_TIMER_PRESETS ? [...presets, ms] : presets
-              })
+              onUpdatePreferences({ timerDurationMs: ms })
             }}
           />
           <span className="flex items-center gap-1.5">

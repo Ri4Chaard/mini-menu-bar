@@ -15,6 +15,14 @@ export interface PanelController {
   state(): PanelState
   close(): void
   /**
+   * Show the panel regardless of what it is currently doing.
+   *
+   * Deliberately not a `tray-click`, which TOGGLES: an alarm that fires while
+   * the panel happens to be open would close it, hiding the one control the
+   * user needs. Idempotent, so repeated calls are harmless.
+   */
+  show(): void
+  /**
    * Ignore focus loss for the next `ms`. Used by the one operation that
    * deliberately hands focus elsewhere - dragging a file out - where FR-002's
    * "activating another application dismisses the panel" would otherwise hide
@@ -56,6 +64,10 @@ export function createPanelController(mb: Menubar): PanelController {
     state: () => state,
     close() {
       apply(panelReducer(state, 'escape'))
+    },
+    show() {
+      if (state.visible) return
+      apply({ visible: true, lastDismissal: null })
     },
     suppressDismissal(ms) {
       // Bounded, and never shortened by a later shorter request. An unbounded
