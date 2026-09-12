@@ -135,11 +135,21 @@ application. *(FR-103, SC-015)*
 This feature deletes a poll loop and changes the adapter, so the constitution requires measured idle
 CPU to be reported. Baseline from [R-212](./research.md#r-212):
 
-| Metric | Before | After |
-|---|---|---|
-| Idle CPU, previews on | 0.277% | _record_ |
-| Memory, physical footprint | 96.7 MB | _record_ |
-| Renderer payload | 332.5 KB of 500 KB | _record_ |
+| Metric | Before | After | |
+|---|---|---|---|
+| Idle CPU, previews on | 0.277% | **0.185%** | ✅ −33% |
+| Memory, physical footprint | 96.7 MB | 110.5 MB | ⚠️ see note |
+| Renderer payload | 332.5 KB of 500 KB | **319.4 KB** | ✅ −13.1 KB |
+
+**Measured 2026-09-12**, panel closed, `previews.screenshots` and `previews.timer` enabled — the
+developer's real configuration. CPU is a cumulative-time delta over a 65 s window, not a `top` sample.
+
+**On the memory figure**: this is not a clean win and should not be reported as one. The increase
+sits almost entirely in Chromium's GPU process (31.0 → 40.7 MB), which was already observed to be
+volatile during baselining — it peaked at 139.7 MB before settling to 31.0 MB on the same build. The
+main process fell slightly (36.9 → 32.9 MB) and the renderer is flat. Treat memory as unchanged
+within noise rather than regressed, and re-measure across several launches before drawing any
+conclusion.
 
 Measure CPU as a cumulative-time delta over a wall-clock window rather than sampling `top`, which
 drops processes in and out of its row list and gives unstable figures:

@@ -162,13 +162,41 @@ wine-glass mark in both appearances.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T048 Run Gates 1–3 of `specs/003-mvp-screenshots-timer/quickstart.md`: static checks, payload budget, browser mode
-- [ ] T049 Run quickstart Gate 4 against `/tmp/prefs-before.json` and confirm no removed field persists
-- [ ] T050 Run Gate 5 of `specs/003-mvp-screenshots-timer/quickstart.md` covering every badge state, watching for a single frame of "0" or the old glyph on the delete-all step
+> `[~]` = the automatable half was run and passed; the remainder needs a person at the keyboard.
+> Nothing below is ticked on the strength of a test that did not actually exercise it.
+
+- [~] T048 Run Gates 1–3 of `specs/003-mvp-screenshots-timer/quickstart.md`: static checks, payload budget, browser mode
+- [~] T049 Run Gate 4 of `specs/003-mvp-screenshots-timer/quickstart.md` against `/tmp/prefs-before.json` and confirm no removed field persists
+- [~] T050 Run Gate 5 of `specs/003-mvp-screenshots-timer/quickstart.md` covering every badge state, watching for a single frame of "0" or the old glyph on the delete-all step
 - [ ] T051 Run quickstart Gate 6 manual ergonomics including the two-stage `Escape`, and **note the result in the change description** as the constitution's manual gate requires
 - [ ] T052 Run quickstart Gate 7 — the unprobed R-207 assumption that a drag suppresses the following `click`; apply the movement-threshold fallback if selection toggles after a drag
-- [ ] T053 Run Gate 8 of `specs/003-mvp-screenshots-timer/quickstart.md` and record the after-figures for idle CPU, memory and payload in that file; idle CPU should fall from the 0.277% baseline now that the poll loop is gone
-- [ ] T054 [P] Update `README.md` to describe two features rather than four, and remove the Spotify permission and network-access notes
+- [X] T053 Run Gate 8 of `specs/003-mvp-screenshots-timer/quickstart.md` and record the after-figures for idle CPU, memory and payload in that file; idle CPU should fall from the 0.277% baseline now that the poll loop is gone
+- [X] T054 [P] Update `README.md` to describe two features rather than four, and remove the Spotify permission and network-access notes
+
+### What the `[~]` tasks still need (2026-09-12)
+
+Verified automatically:
+
+- **T048** — Gate 1 (typecheck, lint, 322 tests) and Gate 2 (payload 319.4 KB) pass. `dev:browser`
+  serves HTTP 200 and the bundle builds. The *interaction* checklist in Gate 3 — clicking a
+  thumbnail, double-clicking, typing a duration — was not driven.
+- **T049** — the real app launches cleanly against the un-migrated `preferences.json`, which still
+  contains `previews.spotify` and `screenshotsSeenWatermark` (FR-094 confirmed in the app, not only
+  in a unit test). The file is not rewritten until a preference actually changes, which is correct;
+  `tests/unit/preferences-migration.spec.ts` covers the write path.
+- **T050** — every badge state was rendered through the real Electron pipeline and inspected:
+  `0` produces no badge, `42` renders "42", `100` renders "99+". The *live menu bar* was not observed
+  while deleting the last screenshot, which is the frame Gate 5 warns about.
+
+Still requires a person at the keyboard:
+
+- **T051** — Gate 6 ergonomics, above all the two-stage `Escape` from R-208. The implementation stops
+  propagation on the first Escape so `PanelShell` never sees it; that is sound by construction but
+  has not been exercised against a real keyboard.
+- **T052** — Gate 7, the one assumption in the plan that could not be probed: that Chromium
+  suppresses `click` after a drag. This matters more now that click means *select*. If a dragged
+  thumbnail comes back with its selection toggled, apply the movement-threshold fallback named in
+  R-207.
 
 ---
 

@@ -1,8 +1,7 @@
 # Mini Menu Bar
 
-A lightweight macOS menu bar hub for four everyday things: recent screenshots, a countdown timer,
-Spotify control, and quick notes — with independently toggleable glanceable previews rendered
-straight into the menu bar.
+A lightweight macOS menu bar hub for two everyday things: recent screenshots and a countdown timer —
+with independently toggleable glanceable previews rendered straight into the menu bar.
 
 Built with Electron, TypeScript, React, Tailwind CSS v4, Motion, and Lucide.
 
@@ -18,27 +17,17 @@ which macOS stamps on every screenshot and which survives renaming and moving.
 
 The app never touches your files on its own initiative. It indexes screenshots strictly read-only —
 watching, reading metadata, building thumbnails — and never changes your system screenshot location.
-The only exceptions are the two things you explicitly click: **Copy** puts screenshots on the
-clipboard, and **Delete** moves them to the Trash, where they stay recoverable in Finder. Nothing is
-ever hard-deleted, renamed, or overwritten. Uninstalling leaves everything exactly as it was.
+The only exception is the one thing you explicitly click: **Delete** moves screenshots to the Trash,
+where they stay recoverable in Finder. Nothing is ever hard-deleted, renamed, or overwritten.
+Uninstalling leaves everything exactly as it was.
 
-### One network request, and only one
+To get a screenshot into another application, drag it out of the panel — that hands the real file to
+whatever you drop it on, and copies at the destination.
 
-The app has no account, no telemetry, and no analytics. It makes exactly one outbound request:
-**album artwork** for the track Spotify is currently playing. There is no local source for it —
-Spotify's scripting interface hands back a URL, not image bytes.
+### No network access at all
 
-That request is bounded, and the bounds are why it is acceptable in an otherwise offline app:
-
-- Image bytes only, from Spotify's artwork host, over https.
-- Made by the main process, never the interface. The panel receives the image, never the address,
-  so the UI works fully with no network at all.
-- No cookies, no credentials, no header identifying you.
-- Only while the Spotify section is open or its menu bar preview is on; once per artwork per
-  session, cached in memory.
-- On failure it is silent: a placeholder shows and everything else still works.
-
-See `specs/002-panel-ui-v2/spec.md` FR-087.
+The app has no account, no telemetry, and no analytics, and it makes no outbound requests of any
+kind. The single exception used to be album artwork for Spotify; that went when Spotify did.
 
 ## Getting started
 
@@ -100,26 +89,29 @@ it, and Chromium throttles hidden windows to roughly one tick a minute — a ren
 silently stall whenever the panel was closed. Storing an absolute deadline instead of accumulating
 ticks also makes surviving system sleep free.
 
-**Nothing polls by default.** Screenshot detection is push-based via FSEvents. Spotify polls only
-while something is watching, and stops when the last observer goes away. With the panel closed and no
-previews enabled, the app does no periodic work at all.
+**Nothing polls, ever.** Screenshot detection is push-based via FSEvents, and the countdown is a
+single absolute deadline rather than a tick loop. With the panel closed the app does no periodic work
+at all — the last polling loop in the codebase went when Spotify did.
 
 ## Budgets
 
 These are enforced, not aspirational. `npm run build` fails if the renderer payload exceeds 500 KB
-uncompressed (currently ~305 KB). Idle CPU must be effectively zero with the panel closed.
+uncompressed (currently ~319 KB). Idle CPU must be effectively zero with the panel closed; the last
+measurement was 0.185% with the screenshot and timer previews both on.
 
 ## Permissions
 
 - **Screenshots** — read access to your screenshot folder and Desktop.
-- **Spotify** — automation access, requested the first time you open the Spotify section. Denial is
-  handled as a distinct state, not an error.
 - **Notifications** — for timer completion.
+
+The app does not request automation access to any other application.
 
 ## Project docs
 
-The full specification, plan, research decisions, and validation scenarios live in
-[`specs/001-menu-bar-hub/`](specs/001-menu-bar-hub/). Project principles are in
+The full specification, plan, research decisions, and validation scenarios live in `specs/`, newest
+first: [`003-mvp-screenshots-timer/`](specs/003-mvp-screenshots-timer/) cut the app to these two
+features, [`002-panel-ui-v2/`](specs/002-panel-ui-v2/) built the current panel, and
+[`001-menu-bar-hub/`](specs/001-menu-bar-hub/) established the architecture. Project principles are in
 [`.specify/memory/constitution.md`](.specify/memory/constitution.md).
 
 ## License
