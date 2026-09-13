@@ -28,14 +28,65 @@ jobs:
       - run: npm run build
       - run: npm run release:manifest
 
-      # Builds both architectures and creates the DRAFT release. Signing is
+      # Created up front, and this is load-bearing rather than tidiness.
+      # electron-builder spawns ONE PUBLISHER PER ARCHITECTURE, and each asks
+      # independently whether the release already exists. Run concurrently they
+      # both answer no, both create one, and the tag ends up with two drafts
+      # holding a split of the artifacts - which is exactly what happened on the
+      # first v0.2.0 attempt: one draft had the DMGs, the other had latest.json,
+      # and neither was installable-and-updatable. Creating it here means every
+      # publisher finds it instead of racing to make it.
+      - name: Create the draft release
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --draft \
+            --title "${GITHUB_REF_NAME#v}" \
+            --generate-notes \
+            --notes-file .github/release-notes.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Builds both architectures and uploads into the draft above. Signing is
       # ad-hoc (no Developer ID); see RELEASING.md for what changes when one
       # exists.
       - run: npx electron-builder --mac --arm64 --x64 --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # After electron-builder, which is what created the release to upload to.
-      - run: gh release upload "$GITHUB_REF_NAME" latest.json --clobber
+      - name: Attach the update manifest
+        run: gh release upload "$GITHUB_REF_NAME" latest.json --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # A release missing an artifact is worse than a failed build: the DMGs
+      # without latest.json leave every user's update check reporting a failure,
+      # and latest.json without the DMGs offers an update that cannot be
+      # downloaded. Fail the job rather than leave a half-release to be noticed
+      # by hand.
+      - name: Verify the release is complete
+        run: |
+          expected=(
+            "Mini-Menu-Bar-${GITHUB_REF_NAME#v}-arm64.dmg"
+            "Mini-Menu-Bar-${GITHUB_REF_NAME#v}-arm64.zip"
+            "Mini-Menu-Bar-${GITHUB_REF_NAME#v}-x64.dmg"
+            "Mini-Menu-Bar-${GITHUB_REF_NAME#v}-x64.zip"
+            "latest.json"
+          )
+          actual="$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name')"
+          echo "$actual"
+          status=0
+          for name in "${expected[@]}"; do
+            if ! grep -qxF "$name" <<< "$actual"; then
+              echo "::error::missing release asset: $name"
+              status=1
+            fi
+          done
+          count="$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq \
+            "[.[] | select(.tag_name == \"$GITHUB_REF_NAME\")] | length")"
+          if [ "$count" != "1" ]; then
+            echo "::error::expected exactly one release for $GITHUB_REF_NAME, found $count"
+            status=1
+          fi
+          exit $status
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

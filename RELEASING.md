@@ -29,6 +29,14 @@ step. That matters: `package.json` is the only source of the version, and
 The tag push triggers `.github/workflows/release.yml`, which runs the gates, builds `dmg` and `zip`
 for `arm64` and `x64`, and creates a **draft** release with `latest.json` attached.
 
+The workflow creates the draft **before** running electron-builder, and that ordering matters.
+electron-builder spawns one publisher per architecture, each of which asks independently whether the
+release exists; run concurrently they both answer no and both create one, and the tag ends up with
+two drafts holding a split of the artifacts. The first v0.2.0 attempt did exactly that — one draft
+had the DMGs, the other had `latest.json`, and neither was both installable and updatable. A final
+step now fails the job if any expected asset is missing or if more than one release exists for the
+tag.
+
 ## Publishing the draft
 
 Review the draft, then publish it. This step is load-bearing rather than ceremonial: the app reads
