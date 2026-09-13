@@ -76,4 +76,27 @@ describe('preferences migration (feature 003)', () => {
     expect(revivePreferences({})).toEqual(DEFAULT_PREFERENCES)
     expect(revivePreferences(null)).toEqual(DEFAULT_PREFERENCES)
   })
+
+  describe('the feature 004 update preference', () => {
+    it('defaults to off for a file written before it existed', () => {
+      // The whole migration: revivePreferences reads every field by name with a
+      // typed fallback, so a pre-004 file simply lacks the key and gets false.
+      // Nothing needs a version stamp (R-209, R-405).
+      expect(revivePreferences(STORED_BEFORE_003).updateCheckOnLaunch).toBe(false)
+    })
+
+    it('is off by default, so a fresh install makes no request at launch', () => {
+      // SC-026. If this ever flips, the privacy claim in the README is false.
+      expect(DEFAULT_PREFERENCES.updateCheckOnLaunch).toBe(false)
+    })
+
+    it('survives a round trip once the user turns it on', () => {
+      expect(revivePreferences({ updateCheckOnLaunch: true }).updateCheckOnLaunch).toBe(true)
+    })
+
+    it('falls back rather than trusting a non-boolean', () => {
+      expect(revivePreferences({ updateCheckOnLaunch: 'yes' }).updateCheckOnLaunch).toBe(false)
+      expect(revivePreferences({ updateCheckOnLaunch: 1 }).updateCheckOnLaunch).toBe(false)
+    })
+  })
 })

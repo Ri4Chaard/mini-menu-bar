@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Check, Download, Power } from 'lucide-react'
-import { DEFAULT_PREFERENCES, type Preferences } from '@shared/types'
+import { Check, Download, Power, RefreshCw } from 'lucide-react'
+import { DEFAULT_PREFERENCES, type Preferences, type UpdateCheckResult } from '@shared/types'
 import { useHost } from '../../host/use-host'
 import { FooterNote, HeaderAction, SectionChrome } from '../../components/section-chrome'
 import { Chip } from '../../components/ui/chip'
@@ -9,8 +9,20 @@ import { PREVIEWABLE_SECTIONS } from '../registry'
 
 type PreviewKey = keyof Preferences['previews']
 
-const APP_VERSION = 'v0.1.0'
-const RELEASES_URL = 'https://github.com/yaroslav/mini-menu-bar/releases'
+/**
+ * What the footer is currently saying about updates.
+ *
+ * Neither the version nor the releases URL appears in this file any more. The
+ * version is read from the running application (FR-124) and the address lives
+ * in the main process (FR-126) - the previous constants were a written-down
+ * version that drifted from package.json by construction, and a URL naming a
+ * repository that did not exist.
+ */
+type CheckState =
+  | { kind: 'idle' }
+  | { kind: 'checking' }
+  | { kind: 'done'; result: UpdateCheckResult }
+  | { kind: 'error'; message: string }
 
 /**
  * FR-030: preview toggles are configured inside the panel, not in a separate
@@ -34,10 +46,33 @@ export function SettingsSection({
   const host = useHost()
   const [shortcut, setShortcut] = useState(preferences.timerShortcut ?? '')
   const [shortcutError, setShortcutError] = useState<string | null>(null)
+  const [version, setVersion] = useState<string | null>(null)
+  const [check, setCheck] = useState<CheckState>({ kind: 'idle' })
 
   useEffect(() => {
     setShortcut(preferences.timerShortcut ?? '')
   }, [preferences.timerShortcut])
+
+  useEffect(() => {
+    let cancelled = false
+    void host.getAppVersion().then((value) => {
+      if (!cancelled) setVersion(value)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [host])
+
+  const runCheck = async (): Promise<void> => {
+    setCheck({ kind: 'checking' })
+    try {
+      setCheck({ kind: 'done', result: await host.checkForUpdates() })
+    } catch {
+      // The host normalises every network failure to one code, and the footer
+      // has one failure state, so the message does not vary by cause.
+      setCheck({ kind: 'error', message: "Couldn't check" })
+    }
+  }
 
   const togglePreview = (key: PreviewKey, next: boolean): void => {
     // FR-031: spread the current flags and change exactly one. Sending a bare
@@ -58,22 +93,48 @@ export function SettingsSection({
     void host.setTimerShortcut(DEFAULT_PREFERENCES.timerShortcut)
   }
 
+  const label = version ? `v${version.replace(/^v/, '')}` : '\u2026'
+  const updateAvailable = check.kind === 'done' && check.result.status === 'update-available'
+
+  /**
+   * One row, always. `--band-footer` is a fixed height and the band arithmetic
+   * is asserted in tests/unit/design-tokens.spec.ts, so the status rides in the
+   * existing note rather than adding a line.
+   */
+  const note =
+    check.kind === 'checking'
+      ? `${label} \u00b7 Checking\u2026`
+      : check.kind === 'error'
+        ? `${label} \u00b7 ${check.message}`
+        : updateAvailable && check.kind === 'done'
+          ? `${label} \u2192 v${check.result.latestVersion.replace(/^v/, '')} available`
+          : check.kind === 'done'
+            ? `${label} \u00b7 Up to date`
+            : label
+
   const footer = (
     <>
-      <FooterNote>{APP_VERSION}</FooterNote>
+      <FooterNote>
+        <span role={check.kind === 'error' ? 'alert' : undefined}>{note}</span>
+      </FooterNote>
       <div style={{ gap: 'var(--footer-gap)' }} className="flex items-center">
-        {/* "Updates" opens the releases page in the user's browser rather than
-            checking in-app: an in-app check would be an undeclared outbound
-            request, and this way the app makes none (research.md R-113). */}
-        <a
-          href={RELEASES_URL}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="flex items-center gap-1.5 rounded-[var(--radius-chip)] bg-[var(--color-fill-strong)] px-2 py-1 text-[length:var(--text-control)] text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)]"
+        {/* The download is still a hand-off to the browser (R-113's surviving
+            half); only the check itself moved in-app. This button never holds
+            the URL - main resolves it (FR-126). */}
+        <button
+          type="button"
+          onClick={() => (updateAvailable ? void host.openReleasesPage() : void runCheck())}
+          disabled={check.kind === 'checking'}
+          aria-busy={check.kind === 'checking'}
+          className="flex items-center gap-1.5 rounded-[var(--radius-chip)] bg-[var(--color-fill-strong)] px-2 py-1 text-[length:var(--text-control)] text-[var(--color-text)] disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)]"
         >
-          <Download className="size-3.5" aria-hidden />
-          Updates
-        </a>
+          {updateAvailable ? (
+            <Download className="size-3.5" aria-hidden />
+          ) : (
+            <RefreshCw className="size-3.5" aria-hidden />
+          )}
+          {updateAvailable ? 'Download' : check.kind === 'error' ? 'Retry' : 'Check for updates'}
+        </button>
         <IconButton
           icon={Power}
           label="Quit Mini Menu Bar"
@@ -198,9 +259,30 @@ export function SettingsSection({
               {shortcutError}
             </p>
           ) : (
-            <p className="text-[length:var(--text-micro)] text-[var(--color-text-tertiary)]">
-              Each toggle is independent. Notes has no menu bar preview.
-            </p>
+            /* Off by default: an automatic outbound request has to be the
+               user's choice, not a default they find out about later
+               (FR-126, R-405). */
+            <label className="flex w-fit cursor-pointer items-center gap-2 rounded-[var(--radius-chip)] px-1 py-0.5 hover:bg-[var(--color-fill-subtle)] has-focus-visible:outline has-focus-visible:outline-2 has-focus-visible:outline-[var(--color-accent)]">
+              <input
+                type="checkbox"
+                checked={preferences.updateCheckOnLaunch}
+                onChange={(event) => onUpdatePreferences({ updateCheckOnLaunch: event.target.checked })}
+                className="peer sr-only"
+              />
+              <span
+                aria-hidden
+                className={`flex size-[17px] shrink-0 items-center justify-center rounded-[5px] ${
+                  preferences.updateCheckOnLaunch
+                    ? 'bg-[var(--color-accent)] text-[var(--color-on-accent)]'
+                    : 'bg-[var(--color-fill)] text-transparent'
+                }`}
+              >
+                <Check className="size-2.5" />
+              </span>
+              <span className="text-[length:var(--text-micro)] text-[var(--color-text-secondary)]">
+                Check for updates at launch
+              </span>
+            </label>
           )}
         </section>
       </div>

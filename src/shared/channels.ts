@@ -27,7 +27,10 @@ export const INVOKE_CHANNELS = {
 
   panelClose: 'panel:close',
 
-  appQuit: 'app:quit'
+  appQuit: 'app:quit',
+  appGetVersion: 'app:get-version',
+  appCheckUpdates: 'app:check-updates',
+  appOpenReleases: 'app:open-releases'
 } as const
 
 export const EVENT_CHANNELS = {

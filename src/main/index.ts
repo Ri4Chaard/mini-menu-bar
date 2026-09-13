@@ -10,6 +10,7 @@ import { menubar } from 'menubar'
 import { join } from 'node:path'
 import { EVENT_CHANNELS } from '@shared/channels'
 import { registerIpcHandlers, type AppServices } from './ipc/register'
+import { createUpdateService } from './services/updates/update-service'
 import { createPanelController } from './window/panel-window'
 import { createPreferencesService } from './services/preferences/preferences-service'
 import { createScreenshotService } from './services/screenshots/screenshot-store'
@@ -136,11 +137,28 @@ async function bootstrap(): Promise<void> {
       void screenshots.refreshLocation()
     })
 
-    registerIpcHandlers({ preferences, panel, screenshots, timer, shortcuts } satisfies AppServices)
+    const updates = createUpdateService()
+
+    registerIpcHandlers({
+      preferences,
+      panel,
+      screenshots,
+      timer,
+      shortcuts,
+      updates
+    } satisfies AppServices)
 
     await shortcuts.apply()
     await screenshots.start()
     await tray.refresh()
+
+    // At most once per launch, and only if the user asked for it (FR-126,
+    // R-405). Fire-and-forget: a launch check has no interface to report into,
+    // and Settings reports properly when the user asks. Nothing schedules a
+    // second one - Principle V forbids periodic work.
+    if (preferences.get().updateCheckOnLaunch) {
+      void updates.check().catch(() => {})
+    }
 
     app.on('before-quit', () => {
       shortcuts.dispose()

@@ -95,6 +95,34 @@ export interface Preferences {
    * stops, and the user has to be the one who chose that.
    */
   timerRepeat: boolean
+  /**
+   * Whether to check for a new version once at launch (FR-126).
+   *
+   * Off by default. An automatic outbound request has to be the user's choice,
+   * not a default they discover later. Checked at most once per launch and
+   * never on a timer - see R-405 for why nothing about the check is persisted
+   * beyond this flag.
+   */
+  updateCheckOnLaunch: boolean
+}
+
+export type UpdateStatus = 'up-to-date' | 'update-available'
+
+/**
+ * The outcome of one update check (FR-126).
+ *
+ * Carries no URL. The renderer is told a version and never an address, which is
+ * the same rule FR-087 set for album art - and the concrete fix for the drift
+ * that produced this feature, where a hardcoded releases URL in the settings
+ * section named a repository that did not exist.
+ */
+export interface UpdateCheckResult {
+  status: UpdateStatus
+  currentVersion: string
+  latestVersion: string
+  /** Epoch ms, or null when the manifest carried no usable date. */
+  publishedAt: number | null
+  checkedAt: number
 }
 
 export interface SourceError {
@@ -109,7 +137,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   timerPresets: [60_000, 300_000, 600_000, 1_500_000],
   timerShortcut: 'Control+Option+T',
   timerAlarm: true,
-  timerRepeat: false
+  timerRepeat: false,
+  updateCheckOnLaunch: false
 }
 
 export const SECTION_IDS: readonly SectionId[] = ['screenshots', 'timer']

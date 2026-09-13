@@ -10,7 +10,8 @@ import type {
   Preferences,
   ScreenshotEntry,
   SourceError,
-  TimerState
+  TimerState,
+  UpdateCheckResult
 } from '@shared/types'
 import type { HostBridge, Unsubscribe } from './host-contract'
 
@@ -63,6 +64,10 @@ export function createElectronBridge(): HostBridge {
     closePanel: () => call<void>(INVOKE_CHANNELS.panelClose),
     quitApp: () => call<void>(INVOKE_CHANNELS.appQuit),
     onPanelShown: (cb) => on<void>(EVENT_CHANNELS.panelShown, () => cb()),
+
+    getAppVersion: () => call<string>(INVOKE_CHANNELS.appGetVersion),
+    checkForUpdates: () => call<UpdateCheckResult>(INVOKE_CHANNELS.appCheckUpdates),
+    openReleasesPage: () => call<void>(INVOKE_CHANNELS.appOpenReleases),
 
     getEnvironment: () => 'electron',
     supportsNativeFeatures: () => true

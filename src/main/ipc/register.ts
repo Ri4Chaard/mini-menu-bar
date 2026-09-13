@@ -26,6 +26,7 @@ import type { ScreenshotService } from '../services/screenshots/screenshot-store
 import type { TimerService } from '../services/timer/timer-service'
 import type { ShortcutService } from '../services/shortcuts/shortcut-service'
 import type { PanelController } from '../window/panel-window'
+import type { UpdateService } from '../services/updates/update-service'
 
 export interface AppServices {
   preferences: PreferencesService
@@ -33,6 +34,7 @@ export interface AppServices {
   screenshots?: ScreenshotService
   timer?: TimerService
   shortcuts?: ShortcutService
+  updates?: UpdateService
 }
 
 function need<T>(service: T | undefined, name: string): T {
@@ -105,7 +107,16 @@ export function registerIpcHandlers(services: AppServices): void {
     // menu, so without this channel there is no way out but Activity Monitor
     // (research.md R-113). No confirmation, matching every other menu bar
     // utility.
-    [INVOKE_CHANNELS.appQuit]: () => app.quit()
+    [INVOKE_CHANNELS.appQuit]: () => app.quit(),
+
+    // The version is its own channel rather than a field on the check result:
+    // it has to render before, during and after a failed check, and when the
+    // user never checks at all (contracts/ipc-channels.md).
+    [INVOKE_CHANNELS.appGetVersion]: () => need(services.updates, 'Updates').getVersion(),
+    [INVOKE_CHANNELS.appCheckUpdates]: () => need(services.updates, 'Updates').check(),
+    [INVOKE_CHANNELS.appOpenReleases]: () =>
+      // No payload: the renderer does not hold the address (FR-126).
+      need(services.updates, 'Updates').openReleasesPage()
   }
 
   for (const [channel, handler] of Object.entries(handlers)) {

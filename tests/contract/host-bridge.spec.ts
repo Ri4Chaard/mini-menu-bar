@@ -22,6 +22,7 @@ const CONTRACT_METHODS: (keyof HostBridge)[] = [
   'dismissTimerAlarm',
   'getPreferences', 'updatePreferences', 'setTimerShortcut',
   'closePanel', 'onPanelShown', 'quitApp',
+  'getAppVersion', 'checkForUpdates', 'openReleasesPage',
   'getEnvironment', 'supportsNativeFeatures'
 ]
 
@@ -203,6 +204,53 @@ describe('HostBridge contract — mock implementation', () => {
     })
   })
 
+  describe('the update check (FR-126)', () => {
+    it('reports up to date by default, with no update on offer', async () => {
+      const result = await host.checkForUpdates()
+      expect(result.status).toBe('up-to-date')
+      expect(result.latestVersion).toBe(result.currentVersion)
+    })
+
+    it('reports a newer version when one exists', async () => {
+      host.__mock.setUpdateOutcome({ kind: 'available', latestVersion: '9.9.9' })
+      const result = await host.checkForUpdates()
+      expect(result.status).toBe('update-available')
+      expect(result.latestVersion).toBe('9.9.9')
+    })
+
+    it('does not call an older version an update, because isNewer decides', async () => {
+      // The mock routes through the same comparison the host uses, so it cannot
+      // quietly disagree about what "newer" means.
+      host.__mock.setUpdateOutcome({ kind: 'available', latestVersion: '0.0.0-mock' })
+      expect((await host.checkForUpdates()).status).toBe('up-to-date')
+    })
+
+    it('rejects with NETWORK_UNAVAILABLE when offline, rather than resolving', async () => {
+      // A mock that always succeeds proves nothing (constitution Principle I).
+      host.__mock.setUpdateOutcome({ kind: 'offline' })
+      await expect(host.checkForUpdates()).rejects.toMatchObject({
+        code: 'NETWORK_UNAVAILABLE'
+      })
+    })
+
+    it('never hands the renderer a URL', async () => {
+      host.__mock.setUpdateOutcome({ kind: 'available', latestVersion: '9.9.9' })
+      const result = await host.checkForUpdates()
+      expect(JSON.stringify(result)).not.toMatch(/https?:\/\//)
+    })
+
+    it('reports a version without needing a network call first', async () => {
+      host.__mock.setUpdateOutcome({ kind: 'offline' })
+      await expect(host.getAppVersion()).resolves.toMatch(/^\d+\.\d+\.\d+/)
+    })
+
+    it('opens the releases page on request', async () => {
+      expect(host.__mock.didOpenReleases()).toBe(false)
+      await host.openReleasesPage()
+      expect(host.__mock.didOpenReleases()).toBe(true)
+    })
+  })
+
   describe('the timer finish alarm (FR-090)', () => {
     it('exposes dismissal as its own operation, not as a reset', () => {
       // Dismissing must not throw away a countdown that repeat has already
@@ -323,6 +371,26 @@ describe('HostBridge contract — real implementation wiring', () => {
   it('dismisses the alarm through its own enumerated channel', async () => {
     await real.dismissTimerAlarm()
     expect(invoke).toHaveBeenCalledWith(INVOKE_CHANNELS.timerDismissAlarm, undefined)
+  })
+
+  it('reads the version through its own channel, not bundled into the check', async () => {
+    await real.getAppVersion()
+    expect(invoke).toHaveBeenCalledWith(INVOKE_CHANNELS.appGetVersion, undefined)
+  })
+
+  it('checks for updates through its enumerated channel with no payload', async () => {
+    await real.checkForUpdates()
+    expect(invoke).toHaveBeenCalledWith(INVOKE_CHANNELS.appCheckUpdates, undefined)
+  })
+
+  it('opens the releases page without ever sending a URL (FR-126)', async () => {
+    await real.openReleasesPage()
+    expect(invoke).toHaveBeenCalledWith(INVOKE_CHANNELS.appOpenReleases, undefined)
+    // The point of the assertion: no argument carries an address.
+    const call = (invoke.mock.calls as unknown[][]).find(
+      (c) => c[0] === INVOKE_CHANNELS.appOpenReleases
+    )
+    expect(call?.[1]).toBeUndefined()
   })
 
   it('starts a drag by id, so the renderer never names a file', async () => {

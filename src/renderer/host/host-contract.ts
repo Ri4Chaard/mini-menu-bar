@@ -10,7 +10,8 @@ import type {
   Preferences,
   ScreenshotEntry,
   SourceError,
-  TimerState
+  TimerState,
+  UpdateCheckResult
 } from '@shared/types'
 
 export type Unsubscribe = () => void
@@ -66,6 +67,24 @@ export interface HostBridge {
   // ---- App (FR-076) --------------------------------------------------------
   /** Never resolves in the host: the process exits (research.md R-113). */
   quitApp(): Promise<void>
+
+  // ---- Updates (FR-124, FR-126) --------------------------------------------
+  /** The running application's version. Never a string written down in UI code. */
+  getAppVersion(): Promise<string>
+  /**
+   * Performs the app's one declared outbound request (FR-126).
+   *
+   * Rejects with NETWORK_UNAVAILABLE when the server cannot be reached, and
+   * UNKNOWN when the manifest is unreadable.
+   */
+  checkForUpdates(): Promise<UpdateCheckResult>
+  /**
+   * Hands the releases page to the user's browser.
+   *
+   * Takes no URL on purpose: the renderer never holds the address (FR-087's
+   * rule, and the fix for the hardcoded URL this feature replaced).
+   */
+  openReleasesPage(): Promise<void>
 
   // ---- Environment ---------------------------------------------------------
   getEnvironment(): 'electron' | 'browser'

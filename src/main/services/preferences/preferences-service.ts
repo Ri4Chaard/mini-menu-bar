@@ -56,7 +56,13 @@ export function revivePreferences(raw: unknown): Preferences {
         ? (r.timerShortcut as string | null)
         : DEFAULT_PREFERENCES.timerShortcut,
     timerAlarm: reviveBoolean(r.timerAlarm, DEFAULT_PREFERENCES.timerAlarm),
-    timerRepeat: reviveBoolean(r.timerRepeat, DEFAULT_PREFERENCES.timerRepeat)
+    timerRepeat: reviveBoolean(r.timerRepeat, DEFAULT_PREFERENCES.timerRepeat),
+    // Absent from any file written before feature 004, and the typed fallback
+    // is the whole migration: it reads as false, which is the default anyway.
+    updateCheckOnLaunch: reviveBoolean(
+      r.updateCheckOnLaunch,
+      DEFAULT_PREFERENCES.updateCheckOnLaunch
+    )
   }
 }
 

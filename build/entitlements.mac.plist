@@ -2,8 +2,23 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
   <dict>
-    <!-- mdfind runs as a child process. -->
+    <!-- V8 allocates writable-executable memory for its JIT, which the hardened
+         runtime forbids by default. Note this is NOT about mdfind running as a
+         child process, as an earlier comment here claimed - spawning a child
+         needs no entitlement at all (004 R-402 resolves the review that
+         003's packaging contract deferred). -->
     <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+
+    <!-- Required ONLY while the signature is ad-hoc. Library validation refuses
+         to load a framework whose team identifier does not match the app's, and
+         an ad-hoc signature has no team identifier at all, so the Electron
+         Framework would be rejected at launch. electron-builder warns about
+         exactly this combination.
+
+         REMOVE THIS the day a Developer ID certificate is configured - with a
+         real team identifier, library validation should be left on. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
   </dict>
 </plist>

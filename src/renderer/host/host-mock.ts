@@ -13,8 +13,10 @@ import {
   type Preferences,
   type ScreenshotEntry,
   type SourceError,
-  type TimerState
+  type TimerState,
+  type UpdateCheckResult
 } from '@shared/types'
+import { isNewer } from '@shared/semver'
 import type { HostBridge } from './host-contract'
 import { mergeForMock } from './merge-preferences'
 
@@ -73,9 +75,32 @@ export interface MockControls {
   didQuit(): boolean
   /** Which ids the last drag carried, so the selection rule is assertable. */
   lastDragIds(): string[] | null
+  /**
+   * Choose what the next update check does.
+   *
+   * All three outcomes are reachable because a mock that only succeeds proves
+   * nothing (contracts/host-bridge.md). 'offline' rejects rather than resolving
+   * with a failure shape, matching the host.
+   */
+  setUpdateOutcome(outcome: UpdateOutcome): void
+  /** True once openReleasesPage was called - the mock opens no tab. */
+  didOpenReleases(): boolean
 }
 
+export type UpdateOutcome =
+  | { kind: 'up-to-date' }
+  | { kind: 'available'; latestVersion: string }
+  | { kind: 'offline' }
+
+/**
+ * Deliberately not a plausible release number. Browser mode showing 0.0.0-mock
+ * is what makes it obvious at a glance that this is not a packaged build.
+ */
+const MOCK_VERSION = '0.0.0-mock'
+
 export function createMockBridge(): HostBridge & { __mock: MockControls } {
+  let updateOutcome: UpdateOutcome = { kind: 'up-to-date' }
+  let openedReleases = false
   const now = Date.now()
   let screenshots = seedScreenshots(now)
   let sourceError: SourceError | null = null
@@ -327,10 +352,39 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
       quit = true
     },
 
+    async getAppVersion() {
+      return MOCK_VERSION
+    },
+
+    async checkForUpdates() {
+      if (updateOutcome.kind === 'offline') {
+        throw new BridgeError('NETWORK_UNAVAILABLE', "Couldn't reach the update server.")
+      }
+      const latestVersion =
+        updateOutcome.kind === 'available' ? updateOutcome.latestVersion : MOCK_VERSION
+      return {
+        // Through the same isNewer the host uses, so browser mode and the host
+        // cannot quietly disagree about what "newer" means.
+        status: isNewer(latestVersion, MOCK_VERSION) ? 'update-available' : 'up-to-date',
+        currentVersion: MOCK_VERSION,
+        latestVersion,
+        publishedAt: updateOutcome.kind === 'available' ? Date.now() - 86_400_000 : null,
+        checkedAt: Date.now()
+      } satisfies UpdateCheckResult
+    },
+
+    async openReleasesPage() {
+      openedReleases = true
+    },
+
     getEnvironment: () => 'browser',
     supportsNativeFeatures: () => false,
 
     __mock: {
+      setUpdateOutcome(outcome) {
+        updateOutcome = outcome
+      },
+      didOpenReleases: () => openedReleases,
       setDeleteFails(fails) {
         deleteFails = fails
       },
