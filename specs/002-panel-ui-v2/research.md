@@ -291,6 +291,13 @@ forbids.
 
 ## R-113: Settings secondary actions
 
+> **Superseded in part by [004 R-401](../004-release-and-updates/research.md) (2026-09-13).** The
+> reasoning below is sound *for an application with no releases* and is left intact. Feature 004
+> ships binaries, at which point a user who never visits the releases page never learns an update
+> exists. 004 declares the request in its spec ([FR-126](../004-release-and-updates/spec.md)), which
+> is the route the Privacy clause provides. The `shell.openExternal` decision for the *download*
+> step, and the `app:quit` decision, both survive unchanged.
+
 **Decision**:
 
 | Action | Implementation |

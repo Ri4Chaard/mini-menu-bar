@@ -66,7 +66,7 @@ It is the only channel in either contract that does not return. The preload bind
 | Considered | Why not |
 |---|---|
 | `spotify:like` | No scriptable liked property; the Web API route breaks the Privacy clause ([R-110](../research.md)) |
-| `app:check-updates` | Would be an in-app network call. "Updates" uses `shell.openExternal` — which the existing external-link path already covers, so it needs no channel of its own ([R-113](../research.md)) |
+| `app:check-updates` | Would be an in-app network call. "Updates" uses `shell.openExternal` — which the existing external-link path already covers, so it needs no channel of its own ([R-113](../research.md)). **Superseded by [004](../../004-release-and-updates/contracts/ipc-channels.md)**, which adds this channel once the app has releases to check against |
 | `prefs:set-presets` | `timerPresets` is a `Preferences` field; `prefs:update` already carries it ([R-112](../research.md)) |
 | `prefs:set-preview` | The footer toggle writes `previews.<section>` through `prefs:update` ([R-114](../research.md)) |
 | `spotify:artwork` | Artwork rides `spotify:changed` as a data URL, so the request never leaves main ([R-111](../research.md)) |
