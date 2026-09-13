@@ -12,7 +12,7 @@ section is visible at a glance; the panel itself never scrolls.
 ## The idea
 
 Screenshots get lost. They scatter across the Desktop or land in a folder you forget about. This app
-finds them **wherever they ended up** — it queries Spotlight's `kMDItemIsScreenCapture` attribute,
+finds them **wherever they ended up** — it queries Spotlight's `kMDItemImageIsScreenshot` attribute,
 which macOS stamps on every screenshot and which survives renaming and moving.
 
 The app never touches your files on its own initiative. It indexes screenshots strictly read-only —

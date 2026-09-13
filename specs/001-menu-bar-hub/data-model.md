@@ -33,8 +33,9 @@ A read-only reference to a screenshot file on disk. Derived, never persisted (R-
 
 **Validation rules**
 
-- `path` MUST be absolute and MUST have been confirmed as a screenshot via `kMDItemIsScreenCapture`
-  (R-003). Filename patterns MUST NOT be used to qualify an entry.
+- `path` MUST be absolute and MUST have been confirmed as a screenshot via `kMDItemImageIsScreenshot`
+  (R-003 — and see the correction there; `kMDItemIsScreenCapture` is accepted as a fallback but is
+  never populated on current macOS). Filename patterns MUST NOT be used to qualify an entry.
 - The collection is ordered by `capturedAt` descending and capped at 50 entries (spec assumption).
 - Entries are **never** mutated on disk. No rename, move, copy, or delete (FR-014a).
 

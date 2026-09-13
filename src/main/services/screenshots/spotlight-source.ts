@@ -1,10 +1,23 @@
 /**
  * Spotlight backfill.
  *
- * `kMDItemIsScreenCapture` is set by macOS when the file is written, applies on
- * 10.8+, and survives renaming and moving. That is why the backfill finds
- * screenshots *wherever they ended up* - which is the user's actual stated
- * problem, not just "show me the configured folder" (research.md R-003).
+ * macOS stamps a screenshot with a metadata attribute when the file is written,
+ * and that attribute survives renaming and moving. That is why the backfill
+ * finds screenshots *wherever they ended up* - which is the user's actual
+ * stated problem, not just "show me the configured folder" (research.md R-003).
+ *
+ * WHICH attribute is the whole ballgame, and the obvious-looking name is the
+ * wrong one. `kMDItemIsScreenCapture` is in Apple's MDItem reference and reads
+ * like the right key, but nothing populates it on current macOS - measured on
+ * 15.7.4, a real screenshot reports `(null)` for it and `mdfind` matches zero
+ * files on the whole disk. The attribute macOS actually writes is
+ * `kMDItemImageIsScreenshot`.
+ *
+ * Shipping the wrong one made the backfill return nothing on every machine, and
+ * because `mdfind` exits 0 with no output, that failure was indistinguishable
+ * from "this user has no screenshots". Only staged captures kept appearing,
+ * because staging-source.ts identifies those by provenance and never asks
+ * Spotlight (see SCREENSHOT_ATTRIBUTES below).
  *
  * Filename patterns are deliberately NOT used: they are localised - a Ukrainian
  * system writes "Знімок екрана 2026-08-21 о 17.31.10.png" - and they break on
@@ -17,7 +30,27 @@ import { MAX_SCREENSHOTS } from '@shared/types'
 
 const run = promisify(execFile)
 
-export const SCREENSHOT_QUERY = 'kMDItemIsScreenCapture == 1'
+/**
+ * Every attribute that has meant "this file is a screenshot", newest first.
+ *
+ * `kMDItemImageIsScreenshot` is the one current macOS writes and the only one
+ * that matches anything today. `kMDItemIsScreenCapture` is kept behind it
+ * rather than deleted: it is what Apple's reference documents, it costs one
+ * clause in a query that runs once per launch, and an older macOS that does
+ * populate it keeps working. Neither is asserted to exist - a machine where
+ * both are empty is a machine with no indexed screenshots, which is a normal
+ * state.
+ *
+ * Both the disk-wide query and the single-file check are derived from this
+ * list, so the two can never drift apart and start disagreeing about what a
+ * screenshot is.
+ */
+export const SCREENSHOT_ATTRIBUTES = [
+  'kMDItemImageIsScreenshot',
+  'kMDItemIsScreenCapture'
+] as const
+
+export const SCREENSHOT_QUERY = SCREENSHOT_ATTRIBUTES.map((attr) => `${attr} == 1`).join(' || ')
 const CREATION_ATTR = 'kMDItemContentCreationDate'
 
 export interface RawScreenshot {
@@ -41,6 +74,17 @@ function parseSpotlightDate(value: string): number | null {
 }
 
 /**
+ * Split `mdls -raw` output into one value per requested attribute.
+ *
+ * Exported so the NUL framing is covered by a test without shelling out - it is
+ * the one part of this module's contract with mdls that is easy to get wrong
+ * and invisible when it is.
+ */
+export function parseAttributeValues(stdout: string): string[] {
+  return stdout.split('\0').map((value) => value.trim())
+}
+
+/**
  * True if this specific file carries the screenshot attribute.
  *
  * Spotlight does not index instantly: measured on a real Mac, the attribute
@@ -50,12 +94,15 @@ function parseSpotlightDate(value: string): number | null {
  * until the next launch's backfill.
  */
 export async function isScreenshot(path: string, attempts = 12, delayMs = 500): Promise<boolean> {
+  const names = SCREENSHOT_ATTRIBUTES.flatMap((attr) => ['-name', attr])
+
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
-      const { stdout } = await run('mdls', ['-raw', '-name', 'kMDItemIsScreenCapture', path], {
-        timeout: 5000
-      })
-      if (stdout.trim() === '1') return true
+      const { stdout } = await run('mdls', ['-raw', ...names, path], { timeout: 5000 })
+      // `mdls -raw` separates the values of multiple -name flags with NUL, and
+      // reports an unset one as the literal "(null)". Any attribute saying 1 is
+      // enough - they are alternative spellings of the same fact.
+      if (parseAttributeValues(stdout).includes('1')) return true
     } catch {
       return false
     }

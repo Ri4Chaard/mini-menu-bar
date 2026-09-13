@@ -11,7 +11,7 @@ closes. Run top to bottom; the gates are ordered cheapest-first.
 
 ```bash
 npm install
-mdfind 'kMDItemIsScreenCapture == 1' | wc -l   # need at least 3 screenshots to exercise selection
+mdfind 'kMDItemImageIsScreenshot == 1 || kMDItemIsScreenCapture == 1' | wc -l   # need at least 3 screenshots to exercise selection
 ```
 
 **Back up the preferences file before the first run** — the migration rewrites it, and the original

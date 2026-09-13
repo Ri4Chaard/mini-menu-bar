@@ -10,7 +10,14 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['tests/unit/**/*.spec.ts', 'tests/contract/**/*.spec.ts'],
+    // integration/ talks to the real macOS Spotlight index rather than a mock.
+    // It skips itself off darwin and on a machine with no screenshot history,
+    // so it is safe in the default run - see tests/integration for why it exists.
+    include: [
+      'tests/unit/**/*.spec.ts',
+      'tests/contract/**/*.spec.ts',
+      'tests/integration/**/*.spec.ts'
+    ],
     globals: false
   }
 })

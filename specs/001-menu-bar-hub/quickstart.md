@@ -63,7 +63,7 @@ adapter.
 
 ```bash
 # What the backfill sees, for comparison against the UI:
-mdfind "kMDItemIsScreenCapture == 1" | head -50
+mdfind "kMDItemImageIsScreenshot == 1 || kMDItemIsScreenCapture == 1" | head -50
 # Where macOS is currently saving (unset ⇒ ~/Desktop):
 defaults read com.apple.screencapture location 2>/dev/null || echo "~/Desktop (default)"
 ```
@@ -85,7 +85,7 @@ defaults read com.apple.screencapture location 2>/dev/null || echo "~/Desktop (d
 
 ```bash
 # Before launching:
-mdfind "kMDItemIsScreenCapture == 1" | head -50 | xargs stat -f "%m %N" | sort > /tmp/before.txt
+mdfind "kMDItemImageIsScreenshot == 1 || kMDItemIsScreenCapture == 1" | head -50 | xargs stat -f "%m %N" | sort > /tmp/before.txt
 defaults read com.apple.screencapture location 2>/dev/null > /tmp/loc-before.txt
 ```
 

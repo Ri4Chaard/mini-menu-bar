@@ -58,19 +58,38 @@ not need yet); Webpack (slower, no advantage here).
 **Decision**: Two complementary mechanisms.
 
 1. **Backfill (startup + manual refresh)**: query Spotlight for
-   `kMDItemIsScreenCapture == 1`, sorted by content-creation date, capped at the 50 most recent
-   (spec assumption).
+   `kMDItemImageIsScreenshot == 1 || kMDItemIsScreenCapture == 1`, sorted by content-creation
+   date, capped at the 50 most recent (spec assumption).
 2. **Live detection**: an FSEvents-backed directory watch on the configured screenshot save
    location, read from `defaults read com.apple.screencapture location` (unset ⇒ `~/Desktop`), plus
    `~/Desktop` when that is not already the configured location. New image files are confirmed as
-   screenshots by reading their `kMDItemIsScreenCapture` attribute.
+   screenshots by reading those same attributes.
 
-**Rationale**: This is the finding that most improves the feature. `kMDItemIsScreenCapture` is set by
-macOS when the file is written, applies on 10.8+, and **survives renaming and moving**. That means
+**Rationale**: This is the finding that most improves the feature. The attribute is set by
+macOS when the file is written and **survives renaming and moving**. That means
 the backfill finds screenshots *wherever they ended up* — which is literally the user's stated core
 problem ("saved to some folder I forget about"), not just the folder we happen to watch. The FSEvents
 watch then gives sub-second latency for new captures (SC-002 requires < 3 s) and is push-based, so it
 costs no CPU while idle (SC-011).
+
+**Correction (2026-09-13)**: this decision named the wrong attribute, and shipped that way through
+feature 004. `kMDItemIsScreenCapture` is in Apple's MDItem reference but **nothing populates it on
+current macOS** — measured on 15.7.4, a genuine screenshot reports `(null)` for it and `mdfind`
+matches zero files on the whole disk. The attribute macOS actually writes is
+`kMDItemImageIsScreenshot`.
+
+The consequence was total and silent: the backfill returned nothing on every machine, and the live
+watch dropped every file it saw, because both paths asked the same wrong question. `mdfind` exits 0
+with no output for such a query, so the app could not distinguish it from "this user has no
+screenshots" and rendered the empty state. The only entries that ever appeared were staged captures,
+which `staging-source.ts` identifies by provenance and never asks Spotlight about — which is why the
+app looked like it worked for anyone who leaves the floating thumbnail preview on, and showed nothing
+at all for anyone who does not.
+
+Both names are now queried, newest first, so an older macOS that does populate the documented one
+keeps working. The check that would have caught this is
+`tests/integration/spotlight-attribute.spec.ts`: it asks the real index rather than a mock, which no
+test in the suite had done.
 
 **Read-only compliance**: Both mechanisms only read. Nothing is moved, renamed, or written, per
 FR-014a.
@@ -290,7 +309,7 @@ rather than assumed.
 |---|---|---|
 | R-001 | Menu bar scaffolding | `menubar` v9.5.3, security options passed through |
 | R-002 | Build toolchain | electron-vite; preload built as CJS for `sandbox: true` |
-| R-003 | Screenshot discovery | Spotlight `kMDItemIsScreenCapture` backfill + FSEvents watch |
+| R-003 | Screenshot discovery | Spotlight `kMDItemImageIsScreenshot` backfill + FSEvents watch |
 | R-004 | Timer ownership | Main process, absolute deadline (throttling + sleep correctness) |
 | R-005 | Preview rendering | One tray: image slot + composed, truncated title slot |
 | R-006 | Framer Motion viability | Keep as `motion` + LazyMotion; explicit fallback trigger defined |

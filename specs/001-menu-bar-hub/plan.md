@@ -17,7 +17,7 @@ TypeScript renderer draws the panel and is runnable in a plain browser against a
 
 Two research findings shaped the design more than the framework choices did:
 
-1. **Spotlight's `kMDItemIsScreenCapture` attribute** survives renaming and moving, so the app can
+1. **Spotlight's `kMDItemImageIsScreenshot` attribute** survives renaming and moving, so the app can
    find screenshots *wherever they ended up* — which is the user's actual stated problem, not just
    "show me the folder". ([R-003](./research.md))
 2. **The countdown must live in the main process.** Electron throttles hidden windows, and the panel
@@ -161,7 +161,7 @@ src/
 │   │   └── panel-window.ts    # BrowserWindow options, show/hide, blur-dismiss
 │   ├── services/
 │   │   ├── screenshots/
-│   │   │   ├── spotlight-source.ts  # mdfind backfill, kMDItemIsScreenCapture
+│   │   │   ├── spotlight-source.ts  # mdfind backfill, kMDItemImageIsScreenshot
 │   │   │   ├── fs-watcher.ts        # FSEvents watch on the configured location
 │   │   │   └── screenshot-store.ts  # in-memory collection, ≤50, newest first
 │   │   ├── timer/
