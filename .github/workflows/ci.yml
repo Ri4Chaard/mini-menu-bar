@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  checks:
+    # macOS because the app is macOS-only and the build shells out to iconutil
+    # and friends. The e2e suite is deliberately NOT here: it launches a real
+    # Electron app that owns a Tray, which is the flakiest thing to automate on
+    # a hosted runner, and it must not be what blocks a release. It runs
+    # locally via `npm run test:e2e` and can be promoted to its own
+    # non-blocking job once it has proven stable here.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      # Also enforces the 500 KB renderer payload budget (Principle V).
+      - run: npm run build

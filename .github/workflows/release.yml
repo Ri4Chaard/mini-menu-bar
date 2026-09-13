@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # First, so a tag that disagrees with package.json fails before anything
+      # is built or published.
+      - run: npm run release:check
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - run: npm run release:manifest
+
+      # Builds both architectures and creates the DRAFT release. Signing is
+      # ad-hoc (no Developer ID); see RELEASING.md for what changes when one
+      # exists.
+      - run: npx electron-builder --mac --arm64 --x64 --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # After electron-builder, which is what created the release to upload to.
+      - run: gh release upload "$GITHUB_REF_NAME" latest.json --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

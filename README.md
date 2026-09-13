@@ -24,10 +24,43 @@ Uninstalling leaves everything exactly as it was.
 To get a screenshot into another application, drag it out of the panel — that hands the real file to
 whatever you drop it on, and copies at the destination.
 
-### No network access at all
+### One network request, and you have to ask for it
 
-The app has no account, no telemetry, and no analytics, and it makes no outbound requests of any
-kind. The single exception used to be album artwork for Spotify; that went when Spotify did.
+The app has no account, no telemetry, and no analytics. It makes exactly one outbound request: a
+~150-byte version manifest from this repository's releases, fetched when you press **Check for
+updates** in Settings — or once at launch, if you turn that on, which is off by default.
+
+It carries no cookies, no credentials, and a User-Agent with no version and nothing identifying you
+or your machine. There is no retry and no timer: nothing checks in the background. The download
+itself is still handed to your browser rather than fetched in-app.
+
+That request is declared in [FR-126](specs/004-release-and-updates/spec.md), because the project's
+privacy rule requires any outbound request to be written into a spec before it is implemented. It
+replaces an earlier decision to make no request at all, which was right while there was nothing to
+download and stopped being right once there was ([R-401](specs/004-release-and-updates/research.md)).
+
+## Installing
+
+Download the `.dmg` for your Mac from
+[Releases](https://github.com/Ri4Chaard/mini-menu-bar/releases) — `arm64` for Apple Silicon, `x64`
+for Intel — and drag the app to Applications.
+
+The app is signed, but not notarized by Apple, so macOS blocks it the first time:
+
+1. Double-click the app. macOS refuses to open it.
+2. Open **System Settings → Privacy & Security** and scroll down. An **"Open Anyway"** button appears
+   there, naming the app.
+3. Click it and authenticate.
+
+> Control-click → Open no longer works: Apple removed that bypass for un-notarized apps in macOS
+> Sequoia. The widely repeated "right-click and choose Open" advice is a dead end on current macOS.
+
+If you prefer the terminal: `xattr -dr com.apple.quarantine "/Applications/Mini Menu Bar.app"`
+
+**After an update, macOS will ask for Desktop access and notification permission again.** An ad-hoc
+signature's code hash changes with every build, so the system treats each release as a different
+application. That is the cost of shipping without a paid Developer ID rather than a bug — see
+[RELEASING.md](RELEASING.md).
 
 ## Getting started
 
@@ -51,7 +84,9 @@ Electron, something has leaked past the adapter.
 | `npm test` | Unit + contract suites (Vitest) |
 | `npm run test:e2e` | End-to-end against the built app (Playwright) |
 | `npm run lint` | ESLint, including the architecture rules below |
-| `npm run package` | Build a signed `.dmg` via electron-builder |
+| `npm run package` | Build `.dmg` and `.zip` for arm64 and x64 via electron-builder |
+| `npm run icons` | Regenerate the tray images and `build/icon.icns` |
+| `npm run clean` | Remove build output, release artifacts and test results |
 
 ## Architecture
 
@@ -104,13 +139,15 @@ measurement was 0.185% with the screenshot and timer previews both on.
 - **Screenshots** — read access to your screenshot folder and Desktop.
 - **Notifications** — for timer completion.
 
-The app does not request automation access to any other application.
+The app does not request automation access to any other application. Both permissions are requested
+again after an update, for the reason described under [Installing](#installing).
 
 ## Project docs
 
 The full specification, plan, research decisions, and validation scenarios live in `specs/`, newest
-first: [`003-mvp-screenshots-timer/`](specs/003-mvp-screenshots-timer/) cut the app to these two
-features, [`002-panel-ui-v2/`](specs/002-panel-ui-v2/) built the current panel, and
+first: [`004-release-and-updates/`](specs/004-release-and-updates/) made the app distributable and
+added the update check, [`003-mvp-screenshots-timer/`](specs/003-mvp-screenshots-timer/) cut the app
+to these two features, [`002-panel-ui-v2/`](specs/002-panel-ui-v2/) built the current panel, and
 [`001-menu-bar-hub/`](specs/001-menu-bar-hub/) established the architecture. Project principles are in
 [`.specify/memory/constitution.md`](.specify/memory/constitution.md).
 

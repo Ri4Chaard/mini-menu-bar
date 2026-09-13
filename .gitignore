@@ -6,6 +6,11 @@ out/
 dist/
 release/
 *.tsbuildinfo
+# Generated at release time by scripts/make-release-manifest.mjs and uploaded
+# as a release asset, never committed.
+latest.json
+# Temporary, assembled by scripts/make-icons.mjs on the way to icon.icns.
+*.iconset/
 
 # Test artifacts
 coverage/
