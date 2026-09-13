@@ -16,7 +16,8 @@ let app: ElectronApplication
 let panel: Page
 let profile: string
 
-const SECTIONS = ['Screenshots', 'Timer', 'Spotify', 'Notes', 'Settings']
+// Feature 003 cut the app to two sections plus Settings.
+const SECTIONS = ['Screenshots', 'Timer', 'Settings']
 
 test.beforeAll(async () => {
   profile = await mkdtemp(join(tmpdir(), 'mmb-v2-'))
@@ -47,7 +48,7 @@ test('the panel window is 632 x 235 (FR-041)', async () => {
   expect(size).toEqual([632, 235])
 })
 
-test('the rail shows five icon-only sections with exactly one active (FR-042, FR-043)', async () => {
+test('the rail shows three icon-only sections with exactly one active (FR-042, FR-043)', async () => {
   const rail = panel.getByRole('navigation', { name: 'Sections' })
   for (const label of SECTIONS) {
     await expect(rail.getByRole('button', { name: label })).toBeVisible()
@@ -110,7 +111,7 @@ test('switching sections keeps the rail and band structure fixed (FR-046)', asyn
   await settle(panel)
   const before = { rail: await box('nav'), header: await box('header'), footer: await box('footer') }
 
-  await rail.getByRole('button', { name: 'Spotify' }).click()
+  await rail.getByRole('button', { name: 'Timer' }).click()
   await settle(panel)
   const after = { rail: await box('nav'), header: await box('header'), footer: await box('footer') }
 
@@ -121,7 +122,7 @@ test('switching sections keeps the rail and band structure fixed (FR-046)', asyn
   expect(after.footer.h).toBe(before.footer.h)
 })
 
-test('the preview toggle appears in exactly three sections (FR-077, FR-079, V-119)', async () => {
+test('the preview toggle appears in exactly the previewable sections (FR-077, FR-079, V-119)', async () => {
   const rail = panel.getByRole('navigation', { name: 'Sections' })
   const withToggle: string[] = []
 
@@ -131,10 +132,9 @@ test('the preview toggle appears in exactly three sections (FR-077, FR-079, V-11
     if ((await panel.getByRole('switch').count()) > 0) withToggle.push(label)
   }
 
-  // Notes has no menu bar preview, and Settings is not a previewable section.
-  // The Settings Widget v2 frame draws one anyway - that is the drafting error
-  // this assertion exists to catch.
-  expect(withToggle).toEqual(['Screenshots', 'Timer', 'Spotify'])
+  // Settings is not a previewable section. The Settings Widget v2 frame draws
+  // one anyway - that is the drafting error this assertion exists to catch.
+  expect(withToggle).toEqual(['Screenshots', 'Timer'])
 })
 
 test('the design placeholder copy did not ship (FR-080)', async () => {
