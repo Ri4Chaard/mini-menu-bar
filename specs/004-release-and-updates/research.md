@@ -128,3 +128,38 @@ signed hardened build actually fails, not speculatively.
 The launch check therefore runs at most once per launch, fire-and-forget, after the tray is up. Its
 rejection is swallowed deliberately: a launch check has no interface to report into, and Settings
 reports properly when the user asks.
+
+---
+
+## R-406: The panel needs a keyboard route that does not go through the tray icon
+
+**Decision**: A second global shortcut, `panelShortcut`, defaulting to `Control+Option+M` and
+rebindable from Settings. It toggles the panel exactly as clicking the tray icon does.
+
+**Rationale**: This was found by a user on a 13" MacBook Air, immediately after installing v0.2.0:
+the app was running and its menu bar item was not visible. Nothing had failed. The menu bar was full,
+and on a notched Mac the overflow goes *underneath the notch*, where items are invisible and cannot
+be clicked. macOS 15 has no built-in overflow handling.
+
+The app made that worse in two ways. With the screenshots preview on, the tray item renders a 32 pt
+thumbnail rather than the 18 pt glyph, so it takes nearly double the width of an ordinary status
+item. And more seriously, the tray icon was the **only** way to open the panel — an accessory
+application (`LSUIElement`) has no Dock icon and no application menu, so once the icon was unreachable
+the app was unreachable, including the Settings that would have let the user turn the preview off.
+That is a single point of failure the app controls and should not have had.
+
+A default binding is part of the decision rather than a nicety: a shortcut the user must open the
+panel to configure is no help to a user who cannot open the panel. `Control+Option+M` sits in the
+same modifier family as the existing `Control+Option+T`, so the two read as one convention.
+
+**Rejected**: making the tray item narrower and calling it fixed. It reduces the odds without
+removing the failure mode, and does nothing for a user whose menu bar is full for unrelated reasons.
+
+**Two defects found while building the recorder**, both of which predated this change and affected
+the existing timer binding:
+
+- Pressing Space recorded the literal `" "` character, producing an accelerator that never registers.
+  The user was then told the shortcut was "already used by another app" — wrong, and unactionable.
+  Browser key names are now mapped to Electron's accelerator spelling.
+- A key with no modifier was accepted. Registering one globally takes that key from every application
+  on the machine. The recorder now refuses and says why.

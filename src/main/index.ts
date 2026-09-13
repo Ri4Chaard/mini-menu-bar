@@ -104,10 +104,18 @@ async function bootstrap(): Promise<void> {
       silence: () => notifications.stopAlarm(),
       repeat: () => preferences.get().timerRepeat
     })
-    const shortcuts = createShortcutService(preferences, () => {
+    const shortcuts = createShortcutService(preferences, 'timerShortcut', () => {
       const state = timer.toggle()
       send(EVENT_CHANNELS.timerChanged, state)
       tray.setTimer(state)
+    })
+
+    // The keyboard route into an app that may have no visible tray icon: a full
+    // menu bar on a notched Mac hides status items underneath the notch, where
+    // they cannot be clicked. Toggles, exactly like clicking the icon would
+    // (FR-128).
+    const panelShortcut = createShortcutService(preferences, 'panelShortcut', () => {
+      panel.handle('tray-click')
     })
 
     const tray = createTrayController({
@@ -145,10 +153,12 @@ async function bootstrap(): Promise<void> {
       screenshots,
       timer,
       shortcuts,
+      panelShortcut,
       updates
     } satisfies AppServices)
 
     await shortcuts.apply()
+    await panelShortcut.apply()
     await screenshots.start()
     await tray.refresh()
 
@@ -162,6 +172,7 @@ async function bootstrap(): Promise<void> {
 
     app.on('before-quit', () => {
       shortcuts.dispose()
+      panelShortcut.dispose()
       screenshots.stop()
       timer.stop()
       tray.dispose()

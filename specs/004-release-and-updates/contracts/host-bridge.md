@@ -8,6 +8,8 @@ implementations — `host-bridge.ts` and `host-mock.ts` — satisfy them, and
 getAppVersion(): Promise<string>
 checkForUpdates(): Promise<UpdateCheckResult>
 openReleasesPage(): Promise<void>
+/** Returns false when another application already owns the combination. */
+setPanelShortcut(accelerator: string | null): Promise<boolean>
 ```
 
 ## `UpdateCheckResult`

@@ -77,6 +77,39 @@ describe('preferences migration (feature 003)', () => {
     expect(revivePreferences(null)).toEqual(DEFAULT_PREFERENCES)
   })
 
+  describe('the feature 004 panel shortcut', () => {
+    it('gets its default in a file written before it existed', () => {
+      // This binding is the only keyboard route into the app when the tray
+      // icon is hidden behind a full menu bar, so an upgrading user must get
+      // it without having to configure anything.
+      expect(revivePreferences(STORED_BEFORE_003).panelShortcut).toBe(
+        DEFAULT_PREFERENCES.panelShortcut
+      )
+    })
+
+    it('keeps an explicit null, which means the user cleared it', () => {
+      // null is a real value here, distinct from "missing", so it must not be
+      // overwritten with the default on every load.
+      expect(revivePreferences({ panelShortcut: null }).panelShortcut).toBeNull()
+    })
+
+    it('keeps a user-chosen binding', () => {
+      expect(revivePreferences({ panelShortcut: 'Command+Shift+J' }).panelShortcut).toBe(
+        'Command+Shift+J'
+      )
+    })
+
+    it('falls back rather than trusting a non-string', () => {
+      expect(revivePreferences({ panelShortcut: 42 }).panelShortcut).toBe(
+        DEFAULT_PREFERENCES.panelShortcut
+      )
+    })
+
+    it('does not collide with the timer binding by default', () => {
+      expect(DEFAULT_PREFERENCES.panelShortcut).not.toBe(DEFAULT_PREFERENCES.timerShortcut)
+    })
+  })
+
   describe('the feature 004 update preference', () => {
     it('defaults to off for a file written before it existed', () => {
       // The whole migration: revivePreferences reads every field by name with a

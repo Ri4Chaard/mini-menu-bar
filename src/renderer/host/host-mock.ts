@@ -338,6 +338,11 @@ export function createMockBridge(): HostBridge & { __mock: MockControls } {
       prefs = { ...prefs, timerShortcut: accelerator }
       return true
     },
+    async setPanelShortcut(accelerator) {
+      if (accelerator === 'Command+Space') return false
+      prefs = { ...prefs, panelShortcut: accelerator }
+      return true
+    },
 
     async closePanel() {
       /* no panel to close in a browser tab */

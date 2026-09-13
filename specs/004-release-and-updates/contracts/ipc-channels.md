@@ -14,6 +14,7 @@ here MUST NOT be registered.
 | `app:get-version` | none | `string` | `app.getVersion()`. Separate from the check on purpose: the version must render before, during and after a failed check, and when the user never checks at all. Folding it into the check result would put the version behind a network request. |
 | `app:check-updates` | none | `UpdateCheckResult` | Performs the one declared outbound request ([FR-126](../spec.md)). Rejects with `NETWORK_UNAVAILABLE` when unreachable, `UNKNOWN` when the manifest is malformed. |
 | `app:open-releases` | none | `void` | `shell.openExternal` to the releases page. |
+| `prefs:set-panel-shortcut` | `{ accelerator: string \| null }` | `boolean` | Rebinds the shortcut that opens the panel (FR-128). `false` means another application owns the combination. Its own channel rather than a discriminated payload on `prefs:set-shortcut`, so the enumeration still says what each channel does. |
 
 No new event channels. All three payloads are empty.
 
@@ -41,5 +42,5 @@ interface has exactly one failure state; a second would buy nothing testable.
 
 | Kind | Before | Added | After |
 |---|---|---|---|
-| Invoke | 15 | 3 | 18 |
+| Invoke | 15 | 4 | 19 |
 | Event | 3 | 0 | 3 |

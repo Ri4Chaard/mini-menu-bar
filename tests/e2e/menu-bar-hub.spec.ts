@@ -113,7 +113,9 @@ test('preview toggles are independent (FR-031)', async () => {
   await panel.getByRole('navigation', { name: 'Sections' }).getByRole('button', { name: 'Settings' }).click()
   await settle(panel)
 
-  const previews = panel.locator('section', { hasText: 'Show in menu bar' })
+  // Scoped to the previews LIST, not the whole column: the column also carries
+  // the update-check preference, which is not a preview toggle (FR-128 work).
+  const previews = panel.locator('section', { hasText: 'Show in menu bar' }).locator('ul')
   // Both surviving sections are previewable; Settings is not (FR-076, FR-079).
   await expect(previews.getByRole('checkbox')).toHaveCount(2)
   await expect(previews.locator('label', { hasText: 'Settings' })).toHaveCount(0)

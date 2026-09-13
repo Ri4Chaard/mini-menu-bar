@@ -31,6 +31,11 @@ function reviveNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback
 }
 
+/** null is a real value here - it means "no shortcut" - so only other types fall back. */
+function reviveAccelerator(value: unknown, fallback: string | null): string | null {
+  return value === null || typeof value === 'string' ? value : fallback
+}
+
 function reviveBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback
 }
@@ -51,10 +56,8 @@ export function revivePreferences(raw: unknown): Preferences {
     // Repaired on READ as well as write: the array on disk is user data now
     // (FR-063) and a malformed one must not make preferences unloadable.
     timerPresets: normalisePresets(r.timerPresets as number[] | undefined),
-    timerShortcut:
-      r.timerShortcut === null || typeof r.timerShortcut === 'string'
-        ? (r.timerShortcut as string | null)
-        : DEFAULT_PREFERENCES.timerShortcut,
+    timerShortcut: reviveAccelerator(r.timerShortcut, DEFAULT_PREFERENCES.timerShortcut),
+    panelShortcut: reviveAccelerator(r.panelShortcut, DEFAULT_PREFERENCES.panelShortcut),
     timerAlarm: reviveBoolean(r.timerAlarm, DEFAULT_PREFERENCES.timerAlarm),
     timerRepeat: reviveBoolean(r.timerRepeat, DEFAULT_PREFERENCES.timerRepeat),
     // Absent from any file written before feature 004, and the typed fallback

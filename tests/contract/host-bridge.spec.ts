@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createMockBridge } from '../../src/renderer/host/host-mock'
 import { ALL_INVOKE_CHANNELS, INVOKE_CHANNELS, EVENT_CHANNELS } from '../../src/shared/channels'
 import type { HostBridge } from '../../src/renderer/host/host-contract'
+import { DEFAULT_PREFERENCES } from '../../src/shared/types'
 
 const CONTRACT_METHODS: (keyof HostBridge)[] = [
   'listScreenshots', 'openScreenshot', 'revealScreenshot',
@@ -20,7 +21,7 @@ const CONTRACT_METHODS: (keyof HostBridge)[] = [
   'startScreenshotDrag',
   'getTimerState', 'startTimer', 'pauseTimer', 'resumeTimer', 'resetTimer', 'onTimerStateChanged',
   'dismissTimerAlarm',
-  'getPreferences', 'updatePreferences', 'setTimerShortcut',
+  'getPreferences', 'updatePreferences', 'setTimerShortcut', 'setPanelShortcut',
   'closePanel', 'onPanelShown', 'quitApp',
   'getAppVersion', 'checkForUpdates', 'openReleasesPage',
   'getEnvironment', 'supportsNativeFeatures'
@@ -204,6 +205,32 @@ describe('HostBridge contract — mock implementation', () => {
     })
   })
 
+  describe('the panel shortcut (FR-128)', () => {
+    it('rebinds independently of the timer shortcut', async () => {
+      expect(await host.setPanelShortcut('Control+Option+J')).toBe(true)
+      const prefs = await host.getPreferences()
+      expect(prefs.panelShortcut).toBe('Control+Option+J')
+      // Rebinding one must not disturb the other.
+      expect(prefs.timerShortcut).toBe(DEFAULT_PREFERENCES.timerShortcut)
+    })
+
+    it('reports a combination another application already owns', async () => {
+      // R-012: a failed registration is reported, never a silent no-op.
+      expect(await host.setPanelShortcut('Command+Space')).toBe(false)
+    })
+
+    it('accepts null, meaning no binding at all', async () => {
+      expect(await host.setPanelShortcut(null)).toBe(true)
+      expect((await host.getPreferences()).panelShortcut).toBeNull()
+    })
+
+    it('ships with a default, since it is the only way in when the icon is hidden', () => {
+      // A menu bar app whose icon is pushed under the notch has no other
+      // keyboard route in, so this must work before anyone configures anything.
+      expect(DEFAULT_PREFERENCES.panelShortcut).toBeTruthy()
+    })
+  })
+
   describe('the update check (FR-126)', () => {
     it('reports up to date by default, with no update on offer', async () => {
       const result = await host.checkForUpdates()
@@ -371,6 +398,22 @@ describe('HostBridge contract — real implementation wiring', () => {
   it('dismisses the alarm through its own enumerated channel', async () => {
     await real.dismissTimerAlarm()
     expect(invoke).toHaveBeenCalledWith(INVOKE_CHANNELS.timerDismissAlarm, undefined)
+  })
+
+  it('rebinds the panel shortcut through its own enumerated channel', async () => {
+    await real.setPanelShortcut('Control+Option+M')
+    expect(invoke).toHaveBeenCalledWith(INVOKE_CHANNELS.prefsSetPanelShortcut, {
+      accelerator: 'Control+Option+M'
+    })
+  })
+
+  it('keeps the two shortcut bindings on separate channels', async () => {
+    await real.setTimerShortcut('Control+Option+T')
+    await real.setPanelShortcut('Control+Option+M')
+    const used = (invoke.mock.calls as unknown[][]).map((c) => c[0])
+    expect(used).toContain(INVOKE_CHANNELS.prefsSetShortcut)
+    expect(used).toContain(INVOKE_CHANNELS.prefsSetPanelShortcut)
+    expect(INVOKE_CHANNELS.prefsSetShortcut).not.toBe(INVOKE_CHANNELS.prefsSetPanelShortcut)
   })
 
   it('reads the version through its own channel, not bundled into the check', async () => {

@@ -60,6 +60,8 @@ export function createElectronBridge(): HostBridge {
     updatePreferences: (patch) => call<Preferences>(INVOKE_CHANNELS.prefsUpdate, patch),
     setTimerShortcut: (accelerator) =>
       call<boolean>(INVOKE_CHANNELS.prefsSetShortcut, { accelerator }),
+    setPanelShortcut: (accelerator) =>
+      call<boolean>(INVOKE_CHANNELS.prefsSetPanelShortcut, { accelerator }),
 
     closePanel: () => call<void>(INVOKE_CHANNELS.panelClose),
     quitApp: () => call<void>(INVOKE_CHANNELS.appQuit),

@@ -44,14 +44,8 @@ export function SettingsSection({
   onUpdatePreferences: (patch: Partial<Preferences>) => void
 }): ReactNode {
   const host = useHost()
-  const [shortcut, setShortcut] = useState(preferences.timerShortcut ?? '')
-  const [shortcutError, setShortcutError] = useState<string | null>(null)
   const [version, setVersion] = useState<string | null>(null)
   const [check, setCheck] = useState<CheckState>({ kind: 'idle' })
-
-  useEffect(() => {
-    setShortcut(preferences.timerShortcut ?? '')
-  }, [preferences.timerShortcut])
 
   useEffect(() => {
     let cancelled = false
@@ -80,17 +74,10 @@ export function SettingsSection({
     onUpdatePreferences({ previews: { ...preferences.previews, [key]: next } })
   }
 
-  const applyShortcut = async (): Promise<void> => {
-    setShortcutError(null)
-    const value = shortcut.trim() || null
-    const ok = await host.setTimerShortcut(value)
-    // R-012: a registration failure must be visible, not a silent no-op.
-    if (!ok) setShortcutError('That shortcut is already used by another app. Try a different one.')
-  }
-
   const resetDefaults = (): void => {
     onUpdatePreferences(DEFAULT_PREFERENCES)
     void host.setTimerShortcut(DEFAULT_PREFERENCES.timerShortcut)
+    void host.setPanelShortcut(DEFAULT_PREFERENCES.panelShortcut)
   }
 
   const label = version ? `v${version.replace(/^v/, '')}` : '\u2026'
@@ -205,87 +192,189 @@ export function SettingsSection({
               )
             })}
           </ul>
+
+          {/* Off by default: an automatic outbound request has to be the user's
+              choice, not a default they find out about later (FR-126, R-405). */}
+          <label className="mt-1 flex w-full cursor-pointer items-center gap-2 rounded-[var(--radius-chip)] px-1 py-0.5 hover:bg-[var(--color-fill-subtle)] has-focus-visible:outline has-focus-visible:outline-2 has-focus-visible:outline-[var(--color-accent)]">
+            <input
+              type="checkbox"
+              checked={preferences.updateCheckOnLaunch}
+              onChange={(event) =>
+                onUpdatePreferences({ updateCheckOnLaunch: event.target.checked })
+              }
+              className="peer sr-only"
+            />
+            <span
+              aria-hidden
+              className={`flex size-[17px] shrink-0 items-center justify-center rounded-[5px] ${
+                preferences.updateCheckOnLaunch
+                  ? 'bg-[var(--color-accent)] text-[var(--color-on-accent)]'
+                  : 'bg-[var(--color-fill)] text-transparent'
+              }`}
+            >
+              <Check className="size-2.5" />
+            </span>
+            <span className="truncate text-[length:var(--text-body)] text-[var(--color-text-secondary)]">
+              Check for updates at launch
+            </span>
+          </label>
         </section>
 
         <div className="w-px shrink-0 bg-[var(--color-hairline)]" />
 
         <section className="flex min-w-0 flex-1 flex-col gap-1.5">
           <h3 className="text-[length:var(--text-micro)] tracking-wide text-[var(--color-text-tertiary)] uppercase">
-            Timer shortcut
+            Shortcuts
           </h3>
-          <div className="flex items-center gap-2">
-            {/* The field IS the recorder: click it, press the combination.
-                A raw text box beside the chips would show the same shortcut
-                twice and leave the chips purely decorative. */}
-            <button
-              type="button"
-              aria-label="Record timer shortcut"
-              onKeyDown={(event) => {
-                // Tab must still move focus, and Escape must still dismiss the
-                // panel - PanelShell owns both, and swallowing either here
-                // would break Principle III inside one field.
-                if (event.key === 'Tab' || event.key === 'Escape') return
-                event.preventDefault()
-                const parts: string[] = []
-                if (event.ctrlKey) parts.push('Control')
-                if (event.altKey) parts.push('Option')
-                if (event.shiftKey) parts.push('Shift')
-                if (event.metaKey) parts.push('Command')
-                // Modifiers alone are not a shortcut - wait for the real key.
-                if (['Control', 'Alt', 'Shift', 'Meta'].includes(event.key)) return
-                parts.push(event.key.length === 1 ? event.key.toUpperCase() : event.key)
-                setShortcut(parts.join('+'))
-                setShortcutError(null)
-              }}
-              className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 rounded-[var(--radius-control)] bg-[var(--color-fill-subtle)] px-2 py-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)]"
-            >
-              {(shortcut ? shortcut.split('+') : ['Press keys…']).map((key, index) => (
-                <Chip key={`${key}-${index}`}>{key}</Chip>
-              ))}
-            </button>
-            <button
-              type="button"
-              onClick={() => void applyShortcut()}
-              // Carries a text label, so --color-accent-strong: white on the
-              // measured accent is 3.46:1 (contracts/design-tokens.md).
-              className="shrink-0 rounded-[var(--radius-control)] bg-[var(--color-accent-strong)] px-3 py-2 text-[length:var(--text-body)] text-[var(--color-on-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
-            >
-              Apply
-            </button>
-          </div>
-
-          {shortcutError ? (
-            <p role="alert" className="text-[length:var(--text-micro)] text-[var(--color-danger)]">
-              {shortcutError}
-            </p>
-          ) : (
-            /* Off by default: an automatic outbound request has to be the
-               user's choice, not a default they find out about later
-               (FR-126, R-405). */
-            <label className="flex w-fit cursor-pointer items-center gap-2 rounded-[var(--radius-chip)] px-1 py-0.5 hover:bg-[var(--color-fill-subtle)] has-focus-visible:outline has-focus-visible:outline-2 has-focus-visible:outline-[var(--color-accent)]">
-              <input
-                type="checkbox"
-                checked={preferences.updateCheckOnLaunch}
-                onChange={(event) => onUpdatePreferences({ updateCheckOnLaunch: event.target.checked })}
-                className="peer sr-only"
-              />
-              <span
-                aria-hidden
-                className={`flex size-[17px] shrink-0 items-center justify-center rounded-[5px] ${
-                  preferences.updateCheckOnLaunch
-                    ? 'bg-[var(--color-accent)] text-[var(--color-on-accent)]'
-                    : 'bg-[var(--color-fill)] text-transparent'
-                }`}
-              >
-                <Check className="size-2.5" />
-              </span>
-              <span className="text-[length:var(--text-micro)] text-[var(--color-text-secondary)]">
-                Check for updates at launch
-              </span>
-            </label>
-          )}
+          <ShortcutRow
+            label="Open panel"
+            value={preferences.panelShortcut}
+            onApply={(accelerator) => host.setPanelShortcut(accelerator)}
+          />
+          <ShortcutRow
+            label="Start timer"
+            value={preferences.timerShortcut}
+            onApply={(accelerator) => host.setTimerShortcut(accelerator)}
+          />
         </section>
       </div>
     </SectionChrome>
+  )
+}
+
+/**
+ * Electron's accelerator names, drawn the way macOS draws them.
+ *
+ * Stored bindings stay in Electron's spelling ("Control+Option+M") because that
+ * is what globalShortcut takes; only the rendering changes. Symbols are both
+ * what every other macOS app shows AND four times narrower, which is what lets
+ * two shortcut rows fit the fixed 108pt body.
+ */
+const KEY_SYMBOLS: Record<string, string> = {
+  Control: '\u2303',
+  Option: '\u2325',
+  Shift: '\u21e7',
+  Command: '\u2318'
+}
+
+/**
+ * Browser key names that differ from Electron's accelerator spelling.
+ *
+ * Without this, pressing Space records the literal " " character and the
+ * resulting accelerator never registers - it is reported to the user as a
+ * conflict with another app, which is both wrong and unactionable.
+ */
+const KEY_NAMES: Record<string, string> = {
+  ' ': 'Space',
+  ArrowUp: 'Up',
+  ArrowDown: 'Down',
+  ArrowLeft: 'Left',
+  ArrowRight: 'Right',
+  Enter: 'Return',
+  Backspace: 'Backspace',
+  Delete: 'Delete'
+}
+
+/** Electron's spelling for whatever key was pressed. */
+function accelKey(key: string): string {
+  return KEY_NAMES[key] ?? (key.length === 1 ? key.toUpperCase() : key)
+}
+
+/**
+ * One rebindable global shortcut: a recorder and an Apply button.
+ *
+ * Shared by both bindings rather than written twice. The draft lives here, so
+ * recording one shortcut cannot disturb the other, and the error is local for
+ * the same reason - a conflict on the panel binding must not look like a
+ * conflict on the timer's.
+ */
+function ShortcutRow({
+  label,
+  value,
+  onApply
+}: {
+  label: string
+  value: string | null
+  onApply: (accelerator: string | null) => Promise<boolean>
+}): ReactNode {
+  const [draft, setDraft] = useState(value ?? '')
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setDraft(value ?? '')
+  }, [value])
+
+  const apply = async (): Promise<void> => {
+    setError(null)
+    const ok = await onApply(draft.trim() || null)
+    // R-012: a registration failure must be visible, not a silent no-op.
+    if (!ok) setError('Already used by another app.')
+  }
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center gap-2">
+        <span className="w-[72px] shrink-0 text-[length:var(--text-micro)] text-[var(--color-text-secondary)]">
+          {label}
+        </span>
+        {/* The field IS the recorder: click it, press the combination. A raw
+            text box beside the chips would show the same shortcut twice and
+            leave the chips purely decorative. */}
+        <button
+          type="button"
+          aria-label={`Record ${label.toLowerCase()} shortcut`}
+          onKeyDown={(event) => {
+            // Tab must still move focus, and Escape must still dismiss the
+            // panel - PanelShell owns both, and swallowing either here would
+            // break Principle III inside one field.
+            if (event.key === 'Tab' || event.key === 'Escape') return
+            event.preventDefault()
+            const parts: string[] = []
+            if (event.ctrlKey) parts.push('Control')
+            if (event.altKey) parts.push('Option')
+            if (event.shiftKey) parts.push('Shift')
+            if (event.metaKey) parts.push('Command')
+            // Modifiers alone are not a shortcut - wait for the real key.
+            if (['Control', 'Alt', 'Shift', 'Meta'].includes(event.key)) return
+            // A global binding with no modifier steals that key from every
+            // application on the machine. Refuse rather than offer it.
+            if (parts.length === 0) {
+              setError('Add a modifier, such as \u2303 or \u2318.')
+              return
+            }
+            parts.push(accelKey(event.key))
+            setDraft(parts.join('+'))
+            setError(null)
+          }}
+          className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden rounded-[var(--radius-control)] bg-[var(--color-fill-subtle)] px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)]"
+        >
+          {draft ? (
+            draft
+              .split('+')
+              .map((key, index) => (
+                <Chip key={`${key}-${index}`}>{KEY_SYMBOLS[key] ?? key}</Chip>
+              ))
+          ) : (
+            <span className="truncate text-[length:var(--text-micro)] text-[var(--color-text-tertiary)]">
+              Press keys…
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => void apply()}
+          // Carries a text label, so --color-accent-strong: white on the
+          // measured accent is 3.46:1 (contracts/design-tokens.md).
+          className="shrink-0 rounded-[var(--radius-control)] bg-[var(--color-accent-strong)] px-2.5 py-1 text-[length:var(--text-control)] text-[var(--color-on-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+        >
+          Apply
+        </button>
+      </div>
+      {error ? (
+        <p role="alert" className="pl-[80px] text-[length:var(--text-micro)] text-[var(--color-danger)]">
+          {error}
+        </p>
+      ) : null}
+    </div>
   )
 }

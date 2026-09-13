@@ -34,6 +34,7 @@ export interface AppServices {
   screenshots?: ScreenshotService
   timer?: TimerService
   shortcuts?: ShortcutService
+  panelShortcut?: ShortcutService
   updates?: UpdateService
 }
 
@@ -98,6 +99,8 @@ export function registerIpcHandlers(services: AppServices): void {
       services.preferences.update(requireObject(p, 'patch') as Partial<Preferences>),
     [INVOKE_CHANNELS.prefsSetShortcut]: (p) =>
       need(services.shortcuts, 'Shortcuts').rebind(requireNullableString(p, 'accelerator')),
+    [INVOKE_CHANNELS.prefsSetPanelShortcut]: (p) =>
+      need(services.panelShortcut, 'Shortcuts').rebind(requireNullableString(p, 'accelerator')),
 
     // ---- Panel -------------------------------------------------------------
     [INVOKE_CHANNELS.panelClose]: () => services.panel.close(),

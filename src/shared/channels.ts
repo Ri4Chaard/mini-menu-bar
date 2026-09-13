@@ -24,6 +24,7 @@ export const INVOKE_CHANNELS = {
   prefsGet: 'prefs:get',
   prefsUpdate: 'prefs:update',
   prefsSetShortcut: 'prefs:set-shortcut',
+  prefsSetPanelShortcut: 'prefs:set-panel-shortcut',
 
   panelClose: 'panel:close',
 

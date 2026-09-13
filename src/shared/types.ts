@@ -82,6 +82,15 @@ export interface Preferences {
   timerPresets: number[]
   timerShortcut: string | null
   /**
+   * Opens the panel from anywhere (FR-128).
+   *
+   * This is the app's only keyboard route in, and it exists because the tray
+   * icon is not a reliable one: on a Mac with a notch a full menu bar pushes
+   * status items underneath it, where they are invisible AND unclickable. An
+   * accessory app with no Dock icon and no menu is then completely unreachable.
+   */
+  panelShortcut: string | null
+  /**
    * Whether reaching zero makes a sound (FR-088).
    *
    * On by default, because a countdown you have to watch is not a countdown.
@@ -136,6 +145,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   timerDurationMs: 5 * 60 * 1000,
   timerPresets: [60_000, 300_000, 600_000, 1_500_000],
   timerShortcut: 'Control+Option+T',
+  // Same modifier family as the timer binding, so the two are one convention
+  // rather than two arbitrary combinations to remember.
+  panelShortcut: 'Control+Option+M',
   timerAlarm: true,
   timerRepeat: false,
   updateCheckOnLaunch: false

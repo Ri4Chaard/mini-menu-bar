@@ -120,6 +120,21 @@ A maintainer bumps the version, pushes a tag, and CI produces reviewable draft r
 - **FR-127**: A version that cannot be parsed MUST NOT be reported as an update. The comparison fails
   closed.
 
+#### Reaching the app
+
+- **FR-128**: A global keyboard shortcut MUST open the panel, and it MUST be rebindable from
+  Settings. It ships bound by default.
+
+  *Added 2026-09-13 after v0.2.0.* The tray icon is not a reliable way in. On a Mac with a notch a
+  full menu bar pushes status items underneath it, where they are both invisible and unclickable, and
+  an accessory application has no Dock icon and no application menu to fall back on — so the app
+  becomes entirely unreachable, including the Settings that would fix it. A default binding is
+  therefore part of the requirement, not a convenience: a shortcut that must be configured first is
+  no use to someone who cannot open the panel.
+
+- **FR-129**: A shortcut MUST NOT be bindable without at least one modifier, and a binding that
+  another application already owns MUST be reported rather than silently dropped.
+
 ### Success Criteria
 
 - **SC-022**: A downloaded DMG installs and launches on a machine that has never run the app, after
@@ -133,6 +148,8 @@ A maintainer bumps the version, pushes a tag, and CI produces reviewable draft r
   default.
 - **SC-027**: Idle CPU remains effectively 0% and the renderer payload stays within the existing
   500 KB budget.
+- **SC-028**: The panel opens from the keyboard with the menu bar item hidden or absent.
+- **SC-029**: Rebinding one shortcut leaves the other unchanged.
 
 ## Assumptions
 

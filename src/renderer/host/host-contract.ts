@@ -59,6 +59,11 @@ export interface HostBridge {
   getPreferences(): Promise<Preferences>
   updatePreferences(patch: Partial<Preferences>): Promise<Preferences>
   setTimerShortcut(accelerator: string | null): Promise<boolean>
+  /**
+   * Rebind the shortcut that opens the panel (FR-128). Returns false when the
+   * combination is already owned by another application.
+   */
+  setPanelShortcut(accelerator: string | null): Promise<boolean>
 
   // ---- Panel (FR-002) ------------------------------------------------------
   closePanel(): Promise<void>
